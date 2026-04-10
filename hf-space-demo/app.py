@@ -68,7 +68,7 @@ if st.button("Run SAGE Analysis"):
                 env["OPENAI_API_KEY"] = api_key
                 litellm_target = "openai/gpt-4o"
                 
-            st.info(f"Initiating LiteLLM Universal Proxy for {litellm_target} on port {proxy_port}...")
+            st.info(f"Initiating LiteLLM Universal Proxy for {model_provider} on port {proxy_port}...")
             # Spawn LiteLLM Router Subprocess
             litellm_process = subprocess.Popen(
                 ["uv", "run", "litellm", "--model", litellm_target, "--port", proxy_port],
@@ -102,11 +102,14 @@ if st.button("Run SAGE Analysis"):
             
             # Send the orchestrator prompt and then instantly enqueue a graceful termination command
             prompt_str = "Run scan-codebase to map this project, then hunt and summarize papers, and identify architectural gaps comparing it against latest Arxiv papers.\n\n"
-            process.stdin.write(prompt_str)
-            # Add a slight delay for the buffer
-            process.stdin.write("/quit\n")
-            process.stdin.flush()
-            process.stdin.close() # Close stdin so gitclaw knows no more input is coming
+            try:
+                process.stdin.write(prompt_str)
+                time.sleep(1.0) # Wait for agent loop to settle
+                process.stdin.write("/quit\n")
+                process.stdin.flush()
+                # Crucial Fix: DO NOT close process.stdin immediately, as it breaks Node's readline stream processing
+            except BrokenPipeError:
+                pass
             
             # Stream the terminal output to the Web UI live
             for line in process.stdout:
