@@ -82,22 +82,31 @@ if st.button("Run SAGE Analysis"):
             env["OPENAI_API_KEY"] = "sk-litellm-bypass"
             env["OPENAI_BASE_URL"] = f"http://0.0.0.0:{proxy_port}/v1"
             
+            # Remove invalid --prompt flag; gitclaw natively accepts standard input for its REPL Mode
             cmd = [
                 "npx", "--yes", "gitclaw",
                 "--dir", "/app",
-                "--prompt", "Run scan-codebase to map this project, then hunt and summarize papers, and identify architectural gaps comparing it against latest Arxiv papers.",
                 "-m", "openai:gpt-4o"
             ]
             
             process = subprocess.Popen(
                 cmd,
                 cwd=temp_dir,  # Run against the cloned code
+                stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 env=env,
                 bufsize=1
             )
+            
+            # Send the orchestrator prompt and then instantly enqueue a graceful termination command
+            prompt_str = "Run scan-codebase to map this project, then hunt and summarize papers, and identify architectural gaps comparing it against latest Arxiv papers.\n\n"
+            process.stdin.write(prompt_str)
+            # Add a slight delay for the buffer
+            process.stdin.write("/quit\n")
+            process.stdin.flush()
+            process.stdin.close() # Close stdin so gitclaw knows no more input is coming
             
             # Stream the terminal output to the Web UI live
             for line in process.stdout:
