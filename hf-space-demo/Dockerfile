@@ -15,7 +15,7 @@ WORKDIR /app
 COPY . /app
 
 # Install gitclaw globally
-RUN npm install -g @open-gitagent/gitclaw
+RUN npm install -g gitclaw
 
 # Force uv to use the system Python environment inside Docker
 ENV UV_SYSTEM_PYTHON=1

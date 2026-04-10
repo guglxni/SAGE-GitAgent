@@ -37,7 +37,7 @@ if st.button("Run SAGE Analysis"):
             
             # Force gitclaw non-interactive (passes yes to all tool approvals)
             cmd = [
-                "npx", "--yes", "@open-gitagent/gitclaw",
+                "npx", "--yes", "gitclaw",
                 "--dir", "/app",  # The agent manifest definition is in /app
                 "--prompt", "Run scan-codebase to map this project, then hunt and summarize papers, and identify architectural gaps comparing it against latest Arxiv papers.",
                 "-m", "openai:llama3-70b-8192"
