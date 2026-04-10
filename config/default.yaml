@@ -1,0 +1,41 @@
+version: "1"
+environment: default
+
+model:
+  preferred: "claude-sonnet-4-6"
+  fallback:
+    - "claude-haiku-4-5-20251001"
+    - "openai:gpt-4o"
+  constraints:
+    temperature: 0.1
+    max_tokens: 8192
+
+tools:
+  arxiv_search:
+    max_results_default: 5
+    timeout_seconds: 30
+    base_url: "https://export.arxiv.org/api/query"
+
+  fetch_abstract:
+    max_concurrent_requests: 5
+    timeout_seconds: 15
+    max_ids_per_batch: 20
+
+  gitnexus_query:
+    timeout_seconds: 120
+    package_version: "gitnexus@0.22.2"
+
+pipeline:
+  max_techniques_per_scan: 50
+  max_papers_per_hunt: 30
+  max_summaries: 20
+  max_gaps: 100
+
+sod:
+  enabled: true
+  enforcement: advisory
+  verifier_agent: paper-verifier
+
+logging:
+  level: info
+  state_file: .gitagent/state.json

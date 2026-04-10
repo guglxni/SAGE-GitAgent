@@ -1,17 +1,38 @@
 name: fetch-abstract
-description: "Fetch metadata and abstract for one or more arXiv papers by ID."
-version: 1.0.0
+description: "Fetch metadata and abstract for one or more arXiv papers by ID. Used for both paper summarization and SOD verification."
+version: 2.0.0
 
 input_schema:
   type: object
   properties:
     arxiv_id:
       type: string
-      description: "Comma-separated arXiv IDs (e.g., '1706.03762' or '1706.03762, 2310.01848')"
+      description: "Comma-separated arXiv IDs (e.g., '1706.03762' or '1706.03762, 2310.01848'). Maximum 20 IDs per call."
+      pattern: "^[0-9]{4}\\.[0-9]{4,5}(v[0-9]+)?(,\\s*[0-9]{4}\\.[0-9]{4,5}(v[0-9]+)?)*$"
   required:
     - arxiv_id
+  additionalProperties: false
+
+output_schema:
+  type: object
+  properties:
+    xml:
+      type: string
+      description: "Raw arXiv Atom XML feed containing paper entries for all requested IDs"
+    error:
+      type: string
+      description: "Error message if the request failed"
+
+annotations:
+  read_only: true
+  external_api: true
+  rate_limited: true
+  no_auth_required: true
+  max_concurrent: 5
+  accessible_by:
+    - sage-agent
+    - paper-verifier
 
 implementation:
-  type: script
-  path: fetch-abstract.py
+  script: fetch-abstract.py
   runtime: python3

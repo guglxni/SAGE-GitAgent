@@ -1,0 +1,33 @@
+version: "1"
+environment: development
+extends: config/default.yaml
+
+model:
+  preferred: "claude-haiku-4-5-20251001"
+  constraints:
+    temperature: 0.1
+    max_tokens: 4096
+
+tools:
+  arxiv_search:
+    max_results_default: 3
+    timeout_seconds: 15
+
+  fetch_abstract:
+    max_concurrent_requests: 2
+    timeout_seconds: 10
+
+  gitnexus_query:
+    timeout_seconds: 60
+
+pipeline:
+  max_techniques_per_scan: 10
+  max_papers_per_hunt: 5
+  max_summaries: 5
+  max_gaps: 20
+
+sod:
+  enabled: false
+
+logging:
+  level: debug

@@ -16,15 +16,16 @@ from sage.validation import (
 )
 
 # ── Constants ────────────────────────────────────────────────────────────
-GITNEXUS_PACKAGE: str = "gitnexus@0.22.2"  # pinned version — no @latest
+GITNEXUS_PACKAGE: str = "gitnexus@1.5.3"  # pinned version — no @latest
 GITNEXUS_TIMEOUT: int = 120
 
 
-def run_gitnexus_query(query: str) -> str:
+def run_gitnexus_query(query: str, repo: str | None = None) -> str:
     """Execute a GitNexus CLI query in a subprocess.
 
     Args:
         query: Sanitised search query string.
+        repo: Optional repo name to target when multiple repos are indexed.
 
     Returns:
         Stdout from the gitnexus process.
@@ -33,10 +34,11 @@ def run_gitnexus_query(query: str) -> str:
         subprocess.TimeoutExpired: If the query takes too long.
         subprocess.CalledProcessError: If gitnexus exits non-zero.
     """
-    # shlex.quote prevents shell injection — query is never interpolated
-    # into a shell string; it's passed as a direct argv element
+    cmd = ["npx", "-y", GITNEXUS_PACKAGE, "query", query]
+    if repo:
+        cmd += ["--repo", repo]
     result = subprocess.run(
-        ["npx", "-y", GITNEXUS_PACKAGE, "query", query],
+        cmd,
         capture_output=True,
         text=True,
         timeout=GITNEXUS_TIMEOUT,
@@ -61,8 +63,10 @@ def main() -> None:
     if query is None:
         return
 
+    repo = params.get("repo") or None
+
     try:
-        output = run_gitnexus_query(query)
+        output = run_gitnexus_query(query, repo)
         print(output)
     except subprocess.TimeoutExpired:
         emit_error("GitNexus query timed out.")

@@ -1,0 +1,39 @@
+version: "1"
+agent: sage-agent
+note: SAGE is a research tool, not a regulated financial or medical agent. This map covers research integrity and data governance obligations.
+
+capability_rule_map:
+  - capability: paper-citation
+    rules:
+      - id: RI-1
+        description: All cited papers must be verifiable via the public arXiv API before inclusion in output.
+        enforcement: RULES.md — Must Never — no hallucinated IDs
+        automated_check: fetch-abstract verification on every citation
+
+  - capability: source-code-access
+    rules:
+      - id: RI-2
+        description: Source code content must not be transmitted to external APIs. Only structural metadata (file paths, line numbers, technique names) may be used.
+        enforcement: RULES.md — Must Never — no source code sent externally
+        automated_check: gitnexus-query output is structural JSON, not raw source
+
+  - capability: gap-reporting
+    rules:
+      - id: RI-3
+        description: Gap severity classification must follow the defined taxonomy exactly. Severity must not be downgraded to avoid escalation.
+        enforcement: RULES.md — Must Always — severity taxonomy
+        automated_check: GAPS.md format validation in pre_response hook
+
+  - capability: sub-agent-delegation
+    rules:
+      - id: SOD-1
+        description: The agent that identifies a Critical gap must not be the same agent that verifies it. Maker-checker separation required.
+        enforcement: DUTIES.md — Conflict Matrix
+        automated_check: sod_verifications in .gitagent/state.json
+
+  - capability: output-file-writing
+    rules:
+      - id: RI-4
+        description: Only the five defined output files may be written. No source code files may be modified.
+        enforcement: RULES.md — Must Never — no source modification
+        automated_check: pre_tool_use hook blocks unexpected file writes

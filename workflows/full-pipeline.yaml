@@ -1,36 +1,91 @@
 name: sage-full-pipeline
-description: Run the complete SAGE research analysis pipeline incrementally across all steps
-version: 1.0.0
+description: Complete SAGE research analysis pipeline — scan, hunt, summarize, verify, and report gaps.
+version: 2.0.0
+triggers:
+  - manual
 
 inputs:
   - name: target_dir
     type: string
     default: "."
+    description: Path to the ML codebase to analyze
+  - name: max_papers
+    type: number
+    default: 10
+    description: Maximum papers to hunt per technique
+  - name: skip_verification
+    type: boolean
+    default: false
+    description: Skip SOD paper-verifier step (development only)
 
 steps:
-  - id: scan
-    action: Scan the codebase for ML techniques, architectures, and training patterns
+  scan:
     skill: scan-codebase
-    outputs: [techniques_file]
+    prompt: |
+      Analyze the codebase in ${{ inputs.target_dir }}. Use the ml-techniques-taxonomy in knowledge/ml-techniques-taxonomy.md to map detected patterns to canonical names. Also check for notable absences listed in the taxonomy's "Notable Absences" section.
+    inputs:
+      target_dir: ${{ inputs.target_dir }}
+    outputs:
+      techniques_file: TECHNIQUES.md
 
-  - id: hunt
-    action: Search arxiv for papers relevant to detected techniques and gaps
+  hunt:
     skill: hunt-papers
     depends_on: [scan]
+    prompt: |
+      Use the arXiv category codes in knowledge/arxiv-categories.md to construct targeted queries. Limit to ${{ inputs.max_papers }} papers per technique. Prioritize papers from 2020 onwards.
     inputs:
       techniques: ${{ steps.scan.outputs.techniques_file }}
-    outputs: [papers_file]
+      max_papers: ${{ inputs.max_papers }}
+    outputs:
+      papers_file: PAPERS.md
 
-  - id: summarize
-    action: Produce engineering-focused summaries for each found paper
+  summarize:
     skill: summarize-paper
     depends_on: [hunt]
     inputs:
       papers: ${{ steps.hunt.outputs.papers_file }}
-    outputs: [summaries_file]
+    outputs:
+      summaries_file: SUMMARIES.md
 
-  - id: gaps
-    action: Cross-reference techniques against papers to identify implementation gaps
+  identify:
     skill: identify-gaps
-    depends_on: [scan, hunt, summarize]
-    outputs: [gaps_file, related_work_file]
+    depends_on: [scan, summarize]
+    prompt: |
+      Use the severity classification guide in knowledge/severity-classification-guide.md to classify each gap. For each Critical gap, set a flag for verification. Write a draft to GAPS-draft.md first — do not write GAPS.md directly.
+    inputs:
+      techniques: ${{ steps.scan.outputs.techniques_file }}
+      summaries: ${{ steps.summarize.outputs.summaries_file }}
+    outputs:
+      gaps_draft: GAPS-draft.md
+      related_work_file: RELATED_WORK.md
+
+  verify:
+    agent: paper-verifier
+    depends_on: [identify]
+    conditions:
+      - ${{ inputs.skip_verification != true }}
+    prompt: |
+      Read GAPS-draft.md. For each Critical severity gap, call fetch-abstract to verify the cited arxiv ID resolves to a real paper whose abstract supports the claimed technique improvement. Return verdicts as JSON. Move approved Critical gaps to GAPS.md. Move flagged gaps to GAPS-human-review.md.
+    inputs:
+      gaps_draft: ${{ steps.identify.outputs.gaps_draft }}
+      techniques: ${{ steps.scan.outputs.techniques_file }}
+    outputs:
+      gaps_file: GAPS.md
+      human_review_file: GAPS-human-review.md
+
+  finalize:
+    skill: identify-gaps
+    depends_on: [verify]
+    prompt: |
+      Read GAPS.md (verified gaps) and GAPS-draft.md (all gaps). Add all Improvement and Experimental severity gaps from the draft to GAPS.md. Produce a summary statistics block at the top of GAPS.md: total gaps, Critical count, Improvement count, Experimental count, papers cited, verification status.
+    inputs:
+      verified_gaps: ${{ steps.verify.outputs.gaps_file }}
+      gaps_draft: ${{ steps.identify.outputs.gaps_draft }}
+    outputs:
+      final_gaps: GAPS.md
+
+error_handling:
+  on_tool_failure: continue_with_warning
+  on_step_failure: stop_pipeline
+  max_retries: 2
+  retry_delay_seconds: 5

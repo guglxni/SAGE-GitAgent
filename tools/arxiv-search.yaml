@@ -1,20 +1,40 @@
 name: arxiv-search
-description: "Search the arXiv API for papers matching a specific query."
-version: 1.0.0
+description: "Search the arXiv API for papers matching a specific query. Returns Atom XML with paper metadata."
+version: 2.0.0
 
 input_schema:
   type: object
   properties:
     search_query:
       type: string
-      description: "The term or pattern to search for on arXiv (e.g., 'transformer attention mechanism')"
+      description: "The term or pattern to search for on arXiv (e.g., 'flash attention fast memory efficient'). Include category codes for better targeting (e.g., 'gradient clipping transformer cat:cs.LG')."
+      maxLength: 500
     max_results:
       type: number
       description: "Maximum number of papers to return (1-50, default: 5)"
+      minimum: 1
+      maximum: 50
+      default: 5
   required:
     - search_query
+  additionalProperties: false
+
+output_schema:
+  type: object
+  properties:
+    xml:
+      type: string
+      description: "Raw arXiv Atom XML feed containing paper entries"
+    error:
+      type: string
+      description: "Error message if the request failed"
+
+annotations:
+  read_only: true
+  external_api: true
+  rate_limited: true
+  no_auth_required: true
 
 implementation:
-  type: script
-  path: arxiv-search.py
+  script: arxiv-search.py
   runtime: python3

@@ -1,0 +1,23 @@
+version: "1"
+agent: sage-agent
+
+schedule:
+  - type: full_validation
+    cadence: quarterly
+    description: Run gitagent validate --compliance against the full agent definition. Check all SKILL.md frontmatter, tool YAML schemas, and workflow definitions.
+    command: "npx @open-gitagent/gitagent validate"
+
+  - type: dependency_audit
+    cadence: monthly
+    description: Check gitnexus and httpx for known vulnerabilities. Verify gitnexus is still at a maintained version.
+    command: "uv run pip-audit"
+
+  - type: tool_smoke_test
+    cadence: weekly
+    description: Run a minimal end-to-end test against the .test-repo sandbox to confirm all three tools (arxiv-search, fetch-abstract, gitnexus-query) return expected output shapes.
+    command: "uv run pytest tests/test_integration.py -m smoke -v"
+
+  - type: sod_compliance_check
+    cadence: on_every_run
+    description: Verify that paper-verifier sub-agent was invoked for all Critical severity gaps before GAPS.md was written. Logged to .gitagent/state.json.
+    automated: true

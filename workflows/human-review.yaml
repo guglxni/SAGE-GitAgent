@@ -1,0 +1,45 @@
+name: sage-human-review
+description: Human-in-the-loop review workflow for flagged gaps that require human judgment before inclusion in the final report.
+version: 1.0.0
+triggers:
+  - manual
+  - file_created: GAPS-human-review.md
+
+inputs:
+  - name: review_file
+    type: string
+    default: GAPS-human-review.md
+
+steps:
+  summarize_flagged:
+    skill: identify-gaps
+    prompt: |
+      Read GAPS-human-review.md. For each flagged entry, produce a concise human-readable summary explaining WHY the paper-verifier flagged it (ambiguous abstract, conflicting evidence, etc.) and what a human reviewer needs to decide. Output to GAPS-review-briefing.md.
+    inputs:
+      review_file: ${{ inputs.review_file }}
+    outputs:
+      briefing: GAPS-review-briefing.md
+
+  await_human:
+    type: human_approval
+    depends_on: [summarize_flagged]
+    prompt: |
+      Please review GAPS-review-briefing.md and for each entry, add a comment: APPROVE, REJECT, or ESCALATE with your reasoning. Save the file when done.
+    timeout_hours: 48
+    escalation_contact: "repository maintainer"
+
+  apply_decisions:
+    skill: identify-gaps
+    depends_on: [await_human]
+    prompt: |
+      Read GAPS-review-briefing.md with human comments. Apply decisions: append APPROVE entries to GAPS.md, discard REJECT entries, and write ESCALATE entries to GAPS-escalated.md with the human's note attached.
+    inputs:
+      briefing: ${{ steps.summarize_flagged.outputs.briefing }}
+      gaps_file: GAPS.md
+    outputs:
+      updated_gaps: GAPS.md
+      escalated: GAPS-escalated.md
+
+error_handling:
+  on_timeout: escalate_to_human
+  on_step_failure: notify_and_stop

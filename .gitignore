@@ -1,5 +1,18 @@
-# gitagent runtime state
-.gitagent/
+# gitagent runtime state (state.json is committed; cache and deps are not)
+.gitagent/cache/
+.gitagent/deps/
+
+# SAGE draft and pending output files (not committed until finalized)
+GAPS-draft.md
+GAPS-pending.md
+
+# Memory archive (too large for git; use external storage if needed)
+memory/archive/
+
+# Secrets
+.env
+.env.local
+.tmp_test_key
 
 # Node
 node_modules/
@@ -21,8 +34,6 @@ dist/
 *.egg
 
 # Virtual Environments
-.env
-.env.local
 .venv
 venv/
 env/

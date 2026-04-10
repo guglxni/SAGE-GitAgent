@@ -5,7 +5,10 @@ license: MIT
 allowed-tools: gitnexus-query
 metadata:
   author: aaryan-guglani
-  version: "1.0.0"
+  version: "2.0.0"
+  category: analysis
+  risk_tier: low
+  knowledge_refs: ml-techniques-taxonomy,arxiv-categories
 ---
 
 # Scan Codebase
@@ -13,13 +16,34 @@ metadata:
 Analyze the current workspace codebase. Focus exclusively on Machine Learning, NLP, Computer Vision, and Deep Learning components.
 
 ## Instructions
-1. Utilize the `gitnexus-query` tool to search the knowledge graph AST. Example queries: "classes extending torch.nn.Module", "optimizer instantiations", "loss function logic".
-2. Focus on resolving the explicit model definitions and training parameters structurally, not just through raw text.
-3. Identify the architectural paradigms (e.g., Transformers, CNNs, GANs), training patterns (e.g., distributed training, gradient accumulation), and specific algorithms algorithms used (or obviously missing).
-4. Output your findings precisely as a markdown file `TECHNIQUES.md` placed directly in the root of the project.
+
+1. Consult `knowledge/ml-techniques-taxonomy.md` to understand the canonical technique names and what code patterns map to them.
+2. Use the `gitnexus-query` tool to search the knowledge graph AST. Run separate queries for each major category:
+   - "classes extending torch.nn.Module"
+   - "optimizer instantiations"
+   - "loss function logic"
+   - "learning rate scheduler usage"
+   - "gradient clipping clip_grad_norm_"
+   - "mixed precision GradScaler"
+   - "distributed training DistributedDataParallel FSDP"
+3. Focus on resolving explicit model definitions and training parameters structurally, not through raw text.
+4. Identify architectural paradigms (Transformers, CNNs, GANs, Diffusion), training patterns (distributed training, gradient accumulation, mixed precision), and specific algorithms used or obviously missing.
+5. Cross-check the detected patterns against the "Notable Absences" section of `knowledge/ml-techniques-taxonomy.md`. Flag any standard patterns that are absent for the detected architecture type.
+6. Output findings as `TECHNIQUES.md` in the root of the project.
 
 ## Output Format (TECHNIQUES.md)
-Format each detected technique exactly as follows:
+
+```markdown
+# Techniques
+
+## Detected Techniques
+
 - **[Technique Name]** — `[file_path]:[line_range]`
   - Brief description of how it is used.
-  - Any hyperparameter notes.
+  - Hyperparameter notes (if applicable).
+
+## Notable Absences
+
+- **[Missing Technique]** — expected for [detected architecture type]
+  - Why this is expected and what risk the absence creates.
+```

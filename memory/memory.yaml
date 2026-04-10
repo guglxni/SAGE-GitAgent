@@ -1,0 +1,25 @@
+version: "1"
+description: SAGE persistent memory configuration
+
+working_memory:
+  file: memory/MEMORY.md
+  max_lines: 200
+  format: markdown
+
+archive:
+  enabled: true
+  path: memory/archive/
+  trigger: when_working_memory_full
+
+entries:
+  - id: last_analyzed_repo
+    description: The last repository SAGE analyzed — path and git hash
+    retention: until_next_run
+
+  - id: verified_papers_cache
+    description: arxiv IDs that have been successfully verified via fetch-abstract in recent sessions — avoids redundant API calls
+    retention: 30_days
+
+  - id: technique_fingerprints
+    description: Technique signatures from recently scanned repos — used to detect if a re-scan would produce the same result
+    retention: 7_days

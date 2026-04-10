@@ -1,0 +1,24 @@
+version: "1"
+description: SAGE knowledge base — reference documents for ML technique taxonomy, arXiv category codes, and severity classification guidance.
+
+entries:
+  - id: ml-techniques-taxonomy
+    path: ml-techniques-taxonomy.md
+    description: Hierarchical taxonomy of ML techniques that SAGE detects and maps to arXiv papers.
+    priority: high
+    tags: [scan-codebase, techniques, ml, patterns]
+    always_load: false
+
+  - id: arxiv-categories
+    path: arxiv-categories.md
+    description: arXiv category codes and their ML/AI relevance for targeted paper searches.
+    priority: high
+    tags: [hunt-papers, arxiv, categories, search]
+    always_load: false
+
+  - id: severity-guide
+    path: severity-classification-guide.md
+    description: Detailed guidance on when to classify a gap as Critical, Improvement, or Experimental.
+    priority: high
+    tags: [identify-gaps, severity, classification]
+    always_load: false

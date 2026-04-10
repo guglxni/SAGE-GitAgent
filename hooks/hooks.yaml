@@ -1,0 +1,32 @@
+version: "1"
+
+hooks:
+  on_session_start:
+    - description: Initialize SAGE session state and validate environment
+      script: scripts/on_session_start.sh
+      timeout: 10
+
+  pre_tool_use:
+    - description: Log tool invocations and enforce rate limits before any tool call
+      script: scripts/pre_tool_use.sh
+      timeout: 5
+
+  post_tool_use:
+    - description: Log tool results and update session state after each tool call
+      script: scripts/post_tool_use.sh
+      timeout: 5
+
+  pre_response:
+    - description: Validate output format before any response is written to disk
+      script: scripts/pre_response.sh
+      timeout: 5
+
+  on_error:
+    - description: Handle tool failures gracefully and log errors to session state
+      script: scripts/on_error.sh
+      timeout: 5
+
+  on_session_end:
+    - description: Finalize session state, verify SOD handoff completion, clean temp files
+      script: scripts/on_session_end.sh
+      timeout: 10

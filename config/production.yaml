@@ -1,0 +1,39 @@
+version: "1"
+environment: production
+extends: config/default.yaml
+
+model:
+  preferred: "claude-sonnet-4-6"
+  fallback:
+    - "claude-haiku-4-5-20251001"
+    - "openai:gpt-4o"
+    - "openai:gpt-4o-mini"
+  constraints:
+    temperature: 0.1
+    max_tokens: 8192
+
+tools:
+  arxiv_search:
+    max_results_default: 10
+    timeout_seconds: 30
+
+  fetch_abstract:
+    max_concurrent_requests: 5
+    timeout_seconds: 15
+    max_ids_per_batch: 20
+
+  gitnexus_query:
+    timeout_seconds: 120
+
+pipeline:
+  max_techniques_per_scan: 50
+  max_papers_per_hunt: 30
+  max_summaries: 20
+  max_gaps: 100
+
+sod:
+  enabled: true
+  enforcement: advisory
+
+logging:
+  level: info
