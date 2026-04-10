@@ -19,7 +19,7 @@ col1, col2 = st.columns(2)
 with col1:
     model_provider = st.selectbox(
         "Select AI Provider",
-        ["Groq (LLaMa-3 70b)", "Anthropic (Claude-3.5-Sonnet)", "OpenAI (GPT-4o)"]
+        ["Groq (Llama 4 Scout)", "Anthropic (Claude 4.6 Sonnet)", "OpenAI (GPT-5.4 Pro)"]
     )
 with col2:
     # OWASP compliant input masking (type="password") prevents shoulder-surfing and DOM leakage
@@ -48,13 +48,13 @@ if st.button("Run SAGE Analysis"):
             model_string = ""
             if "Groq" in model_provider:
                 env["GROQ_API_KEY"] = api_key
-                model_string = "openai:llama3-70b-8192"
+                model_string = "openai:llama-4-scout"
             elif "Anthropic" in model_provider:
                 env["ANTHROPIC_API_KEY"] = api_key
-                model_string = "anthropic:claude-3-5-sonnet-20241022"
+                model_string = "anthropic:claude-4-6-sonnet-20260217"
             else:
                 env["OPENAI_API_KEY"] = api_key
-                model_string = "openai:gpt-4o"
+                model_string = "openai:gpt-5.4-pro"
             
             cmd = [
                 "npx", "--yes", "gitclaw",
