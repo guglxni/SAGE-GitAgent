@@ -43,29 +43,50 @@ if st.button("Run SAGE Analysis"):
             output_container = st.empty()
             full_log = ""
             
-            # Subprocess execution using env dict prevents key from being logged in process explorer commands
+            # Use LiteLLM to securely proxy the user's BYOK key and exotic model to standard GitClaw formats
             env = os.environ.copy()
-            model_string = ""
+            import time
+            import socket
+            from contextlib import closing
+            
+            def find_free_port():
+                with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+                    s.bind(('', 0))
+                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    return s.getsockname()[1]
+                    
+            proxy_port = str(find_free_port())
+            
+            litellm_target = ""
             if "Groq" in model_provider:
-                # Map Groq through the OpenAI-compatible endpoint native to LiteLLM/Vercel AI SDK configs
-                env["OPENAI_API_KEY"] = api_key
-                env["OPENAI_BASE_URL"] = "https://api.groq.com/openai/v1"
-                model_string = "openai:llama-4-scout" 
+                env["GROQ_API_KEY"] = api_key
+                litellm_target = "groq/llama3-70b-8192" # LiteLLM proxy string format
             elif "Anthropic" in model_provider:
                 env["ANTHROPIC_API_KEY"] = api_key
-                model_string = "anthropic:claude-4-6-sonnet-20260217"
+                litellm_target = "anthropic/claude-3-5-sonnet-20241022" 
             else:
                 env["OPENAI_API_KEY"] = api_key
-                # Clear base URL just in case running locally with stale env
-                if "OPENAI_BASE_URL" in env:
-                    del env["OPENAI_BASE_URL"]
-                model_string = "openai:gpt-5.4-pro"
+                litellm_target = "openai/gpt-4o"
+                
+            st.info(f"Initiating LiteLLM Universal Proxy for {litellm_target} on port {proxy_port}...")
+            # Spawn LiteLLM Router Subprocess
+            litellm_process = subprocess.Popen(
+                ["uv", "run", "litellm", "--model", litellm_target, "--port", proxy_port],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            time.sleep(3) # Wait for litellm server to spin up and bind
+            
+            # Now trick gitclaw into thinking we are running the default hardcoded OpenAI model
+            env["OPENAI_API_KEY"] = "sk-litellm-bypass"
+            env["OPENAI_BASE_URL"] = f"http://0.0.0.0:{proxy_port}/v1"
             
             cmd = [
                 "npx", "--yes", "gitclaw",
                 "--dir", "/app",
                 "--prompt", "Run scan-codebase to map this project, then hunt and summarize papers, and identify architectural gaps comparing it against latest Arxiv papers.",
-                "-m", model_string
+                "-m", "openai:gpt-4o"
             ]
             
             process = subprocess.Popen(
@@ -100,5 +121,7 @@ if st.button("Run SAGE Analysis"):
         except subprocess.CalledProcessError as e:
             st.error(f"Failed to clone repository: {e.stderr}")
         finally:
-            # Always clean up the sandbox
+            # Always clean up the sandbox and router
             shutil.rmtree(temp_dir, ignore_errors=True)
+            if 'litellm_process' in locals():
+                litellm_process.terminate()

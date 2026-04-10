@@ -3,7 +3,7 @@ name: sage-agent
 version: 1.0.0
 description: A research intelligence agent that analyzes ML codebases against arxiv papers.
 model:
-  preferred: claude-sonnet-4-5-20250929
+  preferred: "openai:gpt-4o"
 skills:
   - scan-codebase
   - hunt-papers
