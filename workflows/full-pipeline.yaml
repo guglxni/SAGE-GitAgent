@@ -1,0 +1,36 @@
+name: sage-full-pipeline
+description: Run the complete SAGE research analysis pipeline incrementally across all steps
+version: 1.0.0
+
+inputs:
+  - name: target_dir
+    type: string
+    default: "."
+
+steps:
+  - id: scan
+    action: Scan the codebase for ML techniques, architectures, and training patterns
+    skill: scan-codebase
+    outputs: [techniques_file]
+
+  - id: hunt
+    action: Search arxiv for papers relevant to detected techniques and gaps
+    skill: hunt-papers
+    depends_on: [scan]
+    inputs:
+      techniques: ${{ steps.scan.outputs.techniques_file }}
+    outputs: [papers_file]
+
+  - id: summarize
+    action: Produce engineering-focused summaries for each found paper
+    skill: summarize-paper
+    depends_on: [hunt]
+    inputs:
+      papers: ${{ steps.hunt.outputs.papers_file }}
+    outputs: [summaries_file]
+
+  - id: gaps
+    action: Cross-reference techniques against papers to identify implementation gaps
+    skill: identify-gaps
+    depends_on: [scan, hunt, summarize]
+    outputs: [gaps_file, related_work_file]

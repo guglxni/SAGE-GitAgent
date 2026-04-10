@@ -1,0 +1,29 @@
+spec_version: "0.1.0"
+name: sage-agent
+version: 1.0.0
+description: A research intelligence agent that analyzes ML codebases against arxiv papers.
+model:
+  preferred: claude-sonnet-4-5-20250929
+skills:
+  - scan-codebase
+  - hunt-papers
+  - summarize-paper
+  - identify-gaps
+tools:
+  - arxiv-search
+  - fetch-abstract
+  - gitnexus-query
+runtime:
+  max_turns: 50
+  timeout: 300
+tags:
+  - research
+  - machine-learning
+  - arxiv
+  - productivity
+  - hackathon
+metadata:
+  hackathon: "GitAgent Hackathon 2026"
+  domain: "ML/AI Research Intelligence"
+  upstream_api: "https://export.arxiv.org/api"
+  pipeline: "scan → hunt → summarize → gaps"

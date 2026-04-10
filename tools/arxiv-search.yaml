@@ -1,0 +1,20 @@
+name: arxiv-search
+description: "Search the arXiv API for papers matching a specific query."
+version: 1.0.0
+
+input_schema:
+  type: object
+  properties:
+    search_query:
+      type: string
+      description: "The term or pattern to search for on arXiv (e.g., 'transformer attention mechanism')"
+    max_results:
+      type: number
+      description: "Maximum number of papers to return (1-50, default: 5)"
+  required:
+    - search_query
+
+implementation:
+  type: script
+  path: arxiv-search.py
+  runtime: python3

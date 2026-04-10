@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sage"
+version = "1.0.0"
+description = "SAGE — Search, Analyze, Gap-detect, Explain. A research intelligence agent for ML/AI codebases."
+requires-python = ">=3.12"
+license = "MIT"
+authors = [
+    { name = "Aaryan Guglani" },
+]
+dependencies = [
+    "httpx>=0.28.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.11.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "S",    # flake8-bandit (security)
+    "T20",  # flake8-print
+    "SIM",  # flake8-simplify
+    "ANN",  # flake8-annotations
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "ANN101",  # missing type self
+    "ANN102",  # missing type cls
+    "T201",    # print is our output mechanism for CLI tools
+    "S603",    # subprocess call - we validate inputs
+    "S607",    # partial executable path - npx is expected
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "ANN"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "strict"
+markers = [
+    "integration: marks tests that hit real external APIs (deselect with '-m \"not integration\"')",
+    "unit: marks fast unit tests with no external dependencies",
+]
+
+[tool.coverage.run]
+source = ["src/sage"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

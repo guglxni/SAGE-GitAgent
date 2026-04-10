@@ -1,0 +1,17 @@
+name: gitnexus-query
+description: "Query the GitNexus AST knowledge graph for functions, classes, and architectural dependencies."
+version: 1.0.0
+
+input_schema:
+  type: object
+  properties:
+    query:
+      type: string
+      description: "Semantic or structural query (e.g., 'PyTorch model classes', 'optimizer initializations')"
+  required:
+    - query
+
+implementation:
+  type: script
+  path: gitnexus-query.py
+  runtime: python3

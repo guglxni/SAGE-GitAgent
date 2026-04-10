@@ -1,0 +1,17 @@
+name: fetch-abstract
+description: "Fetch metadata and abstract for one or more arXiv papers by ID."
+version: 1.0.0
+
+input_schema:
+  type: object
+  properties:
+    arxiv_id:
+      type: string
+      description: "Comma-separated arXiv IDs (e.g., '1706.03762' or '1706.03762, 2310.01848')"
+  required:
+    - arxiv_id
+
+implementation:
+  type: script
+  path: fetch-abstract.py
+  runtime: python3

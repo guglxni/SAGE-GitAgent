@@ -1,0 +1,45 @@
+# gitagent runtime state
+.gitagent/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual Environments
+.env
+.env.local
+.venv
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# AI-DLC rule details (development tooling, not part of agent deployment)
+.aidlc-rule-details/
+aidlc-docs/
+agentic-action-audits/
+
+# ArXiv xml dumps
+*.xml
