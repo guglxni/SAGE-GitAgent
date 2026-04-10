@@ -54,3 +54,4 @@ agentic-action-audits/
 
 # ArXiv xml dumps
 *.xml
+.test-repo/

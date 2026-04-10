@@ -1,6 +1,6 @@
 # SAGE HuggingFace Space — Docker build
-# Note: This file mirrors /Dockerfile at repo root.
-# For HF Spaces, use the root Dockerfile (HF requires Dockerfile at repo root).
+# Build context: SAGE repo root (COPY . /app gets all agent files)
+# HuggingFace Spaces: Dockerfile must be at repo root, app_port: 7860
 
 FROM python:3.12-slim
 
@@ -20,16 +20,26 @@ WORKDIR /app
 COPY . /app
 
 # ── Node.js tools ──────────────────────────────────────────────────────────
+# Install gitclaw globally so `gitclaw` binary is on PATH
 RUN npm install -g gitclaw
+
+# Pre-cache gitnexus@1.5.3 so npx doesn't download it at runtime per request
+# (|| true: don't fail build if --version flag not supported)
 RUN npx -y gitnexus@1.5.3 --version 2>/dev/null || \
     npx -y gitnexus@1.5.3 --help 2>/dev/null || true
 
 # ── Python dependencies ────────────────────────────────────────────────────
 ENV UV_SYSTEM_PYTHON=1
+
+# Install project deps from pyproject.toml (includes litellm, httpx, uvicorn)
 RUN uv sync --all-groups 2>/dev/null || true
+
+# Install SAGE package + Streamlit
 RUN uv pip install -e . streamlit
 
-# ── Verify agent files ─────────────────────────────────────────────────────
+# ── HuggingFace Spaces runs as uid 1000 ───────────────────────────────────
+# /tmp is writable by all users — session dirs live there.
+# Verify the agent files are readable at build time.
 RUN ls /app/agent.yaml /app/SOUL.md /app/RULES.md /app/skills /app/tools /app/src \
     && echo "SAGE agent files verified."
 
