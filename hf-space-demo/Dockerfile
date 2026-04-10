@@ -17,6 +17,9 @@ COPY . /app
 # Install gitclaw globally
 RUN npm install -g @open-gitagent/gitclaw
 
+# Force uv to use the system Python environment inside Docker
+ENV UV_SYSTEM_PYTHON=1
+
 # Install SAGE python tools and streamlit
 RUN uv sync --all-groups
 RUN uv pip install -e . streamlit
@@ -24,5 +27,5 @@ RUN uv pip install -e . streamlit
 # Expose Streamlit default port
 EXPOSE 7860
 
-# Run the Streamlit app
-CMD ["uv", "run", "streamlit", "run", "hf-space-demo/app.py", "--server.port", "7860", "--server.address", "0.0.0.0"]
+# Run the Streamlit app correctly exposing to HF router on 0.0.0.0
+CMD ["streamlit", "run", "hf-space-demo/app.py", "--server.port", "7860", "--server.address", "0.0.0.0"]
