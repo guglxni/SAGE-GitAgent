@@ -8,30 +8,37 @@ Architecture:
   - Custom providers use GITCLAW_MODEL_BASE_URL (not OPENAI_BASE_URL).
   - gitnexus@1.5.3 is pre-cached in the Docker image.
 
-Pipeline (3 sequential --prompt calls):
-  Step 1 → TECHNIQUES.md:
-    - We run gitnexus queries in Python and inject the raw JSON into the prompt.
-    - Model writes TECHNIQUES.md from real AST data (no hallucination).
-  Step 2 → PAPERS.md:
-    - We inject TECHNIQUES.md content into the prompt.
-    - Model calls arxiv-search and writes PAPERS.md.
-  Step 3 → GAPS.md:
-    - We inject both TECHNIQUES.md + PAPERS.md into the prompt.
-    - Model writes GAPS.md cross-referencing implementation vs SOTA papers.
+Pipeline (3 sequential --prompt calls, pre-fetched data):
+  We pre-fetch ALL external data in Python before any gitclaw call:
+    Step 1 → TECHNIQUES.md:
+      gitnexus queries run in Python → JSON parsed to bullet text → injected.
+      Model only needs to call write(TECHNIQUES.md).
+    Step 2 → PAPERS.md:
+      arXiv API called directly in Python → XML parsed to paper list → injected.
+      Model only needs to call write(PAPERS.md).
+    Step 3 → GAPS.md:
+      Both files injected as context.
+      Model only needs to call write(GAPS.md).
 
-  Using --prompt (single-turn) for each step guarantees clean exit and
-  avoids REPL multi-line prompt parsing issues and hallucinated file paths.
+  Pre-fetching eliminates:
+    - Tool call failures (network errors inside gitclaw session)
+    - Large XML responses exhausting model context
+    - Models outputting analysis as text instead of write() calls
+    - Hallucinated file paths from raw JSON
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
 import time
+import urllib.parse
 import uuid
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import streamlit as st
@@ -218,21 +225,18 @@ def build_step1_prompt(repo_name: str, gitnexus_json: str) -> str:
     )
 
 
-def build_step2_prompt(repo_name: str, techniques_md: str) -> str:
-    """Step 2: Search arXiv based on TECHNIQUES.md content, write PAPERS.md."""
+def build_step2_prompt(repo_name: str, papers_text: str) -> str:
+    """Step 2: arXiv papers pre-fetched in Python, model only writes PAPERS.md."""
     return (
-        f"You are SAGE, an ML research intelligence agent. Your task has TWO parts.\n\n"
-        f"PART A — Search: The '{repo_name}' codebase has these techniques:\n\n{techniques_md}\n\n"
-        f"Call arxiv-search THREE times (one per line below):\n"
-        f"1. Search for the main architecture type above (e.g. 'GPT transformer language model')\n"
-        f"2. Search for the training technique above (e.g. 'AdamW optimizer transformer training')\n"
-        f"3. Search for ONE notable absence above (e.g. 'gradient clipping transformers')\n\n"
-        f"PART B — Write: After ALL three searches complete, call write(path=\"PAPERS.md\") "
-        f"with a markdown file listing the papers. "
-        f"Use ## High Relevance Papers for architecture/training papers "
-        f"and ## Gap Papers for the absence search. "
-        f"Each entry: paper title, arxiv:XXXX.XXXXX, year, one sentence on relevance to {repo_name}.\n\n"
-        f"IMPORTANT: You MUST end by calling the write tool. Do not just write text."
+        f"Call write(path=\"PAPERS.md\") with a markdown file listing these arXiv papers "
+        f"relevant to the '{repo_name}' ML codebase.\n\n"
+        f"The papers were retrieved from the arXiv API:\n\n{papers_text}\n\n"
+        f"Format PAPERS.md with:\n"
+        f"## High Relevance Papers\n"
+        f"(architecture/training papers — title, arxiv:ID, year, one sentence on relevance)\n\n"
+        f"## Gap Papers\n"
+        f"(papers for techniques NOT found in the codebase — explain the gap)\n\n"
+        f"Call write(path=\"PAPERS.md\") now. Do not output text."
     )
 
 
@@ -346,6 +350,134 @@ def run_gitnexus_queries_local(repo_name: str, status_fn) -> str:
     return combined
 
 
+def _parse_arxiv_xml(xml_text: str) -> list[dict]:
+    """Parse arXiv Atom XML into a list of paper dicts.
+
+    Returns list of {title, arxiv_id, year, summary} dicts.
+    """
+    papers = []
+    try:
+        root = ET.fromstring(xml_text)
+        ns = {"atom": "http://www.w3.org/2005/Atom"}
+        for entry in root.findall("atom:entry", ns):
+            title_el = entry.find("atom:title", ns)
+            id_el = entry.find("atom:id", ns)
+            published_el = entry.find("atom:published", ns)
+            summary_el = entry.find("atom:summary", ns)
+
+            if title_el is None or id_el is None:
+                continue
+
+            full_id = id_el.text or ""
+            # Extract short arxiv ID from URL like https://arxiv.org/abs/2301.12345
+            arxiv_id = full_id.split("/abs/")[-1].strip()
+            year = (published_el.text or "")[:4] if published_el is not None else "?"
+            summary = (summary_el.text or "").strip()[:200] if summary_el is not None else ""
+            title = (title_el.text or "").strip().replace("\n", " ")
+
+            papers.append({
+                "title": title,
+                "arxiv_id": arxiv_id,
+                "year": year,
+                "summary": summary,
+            })
+    except ET.ParseError:
+        pass
+    return papers
+
+
+def _fetch_arxiv(query: str, max_results: int = 4) -> list[dict]:
+    """Fetch papers from arXiv API for a single query using httpx."""
+    encoded = urllib.parse.quote_plus(query)
+    url = (
+        f"https://export.arxiv.org/api/query"
+        f"?search_query=all:{encoded}"
+        f"&max_results={max_results}"
+        f"&sortBy=relevance&sortOrder=descending"
+    )
+    try:
+        import httpx
+        with httpx.Client(timeout=20.0) as client:
+            resp = client.get(url)
+            resp.raise_for_status()
+            return _parse_arxiv_xml(resp.text)
+    except ImportError:
+        # Fallback to urllib if httpx not available
+        import urllib.request
+        try:
+            with urllib.request.urlopen(url, timeout=20) as resp:
+                return _parse_arxiv_xml(resp.read().decode("utf-8"))
+        except Exception:
+            return []
+    except Exception:
+        return []
+
+
+def run_arxiv_searches_local(techniques_md: str, repo_name: str, status_fn) -> str:
+    """Run 3 arXiv searches in Python based on TECHNIQUES.md content.
+
+    Extracts search terms from TECHNIQUES.md and returns formatted paper list.
+    Pre-fetching in Python avoids large XML responses inside gitclaw sessions
+    that exhaust model context or cause tool call failures.
+    """
+    # Extract search queries from TECHNIQUES.md using simple heuristics
+    lines = techniques_md.lower()
+
+    # Query 1: architecture type
+    if "transformer" in lines or "attention" in lines:
+        q1 = f"transformer attention mechanism {repo_name} architecture"
+    elif "cnn" in lines or "convolution" in lines:
+        q1 = "convolutional neural network architecture training"
+    elif "diffusion" in lines:
+        q1 = "diffusion model generative training"
+    else:
+        q1 = f"deep learning neural network architecture {repo_name}"
+
+    # Query 2: training / optimizer
+    if "adamw" in lines:
+        q2 = "AdamW optimizer transformer training convergence"
+    elif "adam" in lines:
+        q2 = "Adam optimizer deep learning training"
+    elif "training loop" in lines or "loss" in lines:
+        q2 = "transformer training optimization techniques"
+    else:
+        q2 = "neural network training optimizer learning rate"
+
+    # Query 3: first notable absence
+    q3 = "transformer gradient clipping learning rate scheduler"
+    for line in techniques_md.splitlines():
+        if line.strip().startswith(("- ", "* ", "1.", "2.", "3.")):
+            absence_text = re.sub(r"^[-*\d.]\s*\*?\*?", "", line).strip().rstrip("*")
+            if absence_text and len(absence_text) > 5:
+                q3 = f"{absence_text} transformer deep learning"
+                break
+
+    all_papers: list[dict] = []
+    seen_ids: set[str] = set()
+    query_labels = ["architecture", "training/optimizer", "notable-absence"]
+
+    for label, query in zip(query_labels, [q1, q2, q3]):
+        status_fn(f"Searching arXiv: {query[:60]}...")
+        papers = _fetch_arxiv(query, max_results=3)
+        for p in papers:
+            if p["arxiv_id"] not in seen_ids:
+                seen_ids.add(p["arxiv_id"])
+                p["label"] = label
+                all_papers.append(p)
+
+    if not all_papers:
+        return "(no arXiv papers found)"
+
+    lines_out = []
+    for p in all_papers:
+        lines_out.append(
+            f"- [{p['label']}] **{p['title']}** "
+            f"(arxiv:{p['arxiv_id']}, {p['year']}) — {p['summary'][:150]}"
+        )
+    status_fn(f"arXiv: {len(all_papers)} papers found across 3 queries.")
+    return "\n".join(lines_out)
+
+
 def run_gitnexus_analyze(clone_dir: Path, status_fn) -> None:
     status_fn(f"Indexing AST with gitnexus@1.5.3...")
     result = subprocess.run(
@@ -413,6 +545,70 @@ def _run_gitclaw_step(
     return process.returncode
 
 
+def _synthesize_gaps_fallback(repo_name: str, techniques_md: str, papers_md: str) -> str:
+    """Build a basic GAPS.md from the pre-fetched data without an LLM call.
+
+    Used when the model fails to write GAPS.md. Extracts notable absences from
+    TECHNIQUES.md and matches them against papers in PAPERS.md.
+    """
+    # Count techniques and papers for summary
+    techniques_count = techniques_md.count("\n- ") + techniques_md.count("\n**")
+    papers_count = papers_md.count("arxiv:")
+
+    # Extract notable absences from TECHNIQUES.md
+    absences: list[str] = []
+    in_absences = False
+    for line in techniques_md.splitlines():
+        if "notable absence" in line.lower() or "## notable" in line.lower():
+            in_absences = True
+            continue
+        if in_absences and line.startswith("##"):
+            break
+        if in_absences and line.strip().startswith(("-", "*", "1", "2", "3", "4", "5")):
+            absence = re.sub(r"^[-*\d.]\s*\*?\*?", "", line).split("—")[0].strip().rstrip("*")
+            if absence:
+                absences.append(absence)
+
+    # Extract paper references from PAPERS.md
+    paper_refs: list[str] = []
+    for line in papers_md.splitlines():
+        if "arxiv:" in line.lower():
+            paper_refs.append(line.strip())
+
+    lines = [
+        f"# Gap Analysis: {repo_name}",
+        "",
+        "## Summary",
+        f"{techniques_count} techniques detected, {papers_count} papers cross-referenced, "
+        f"{len(absences)} gaps identified from notable absences.",
+        "",
+        "## Critical Gaps",
+    ]
+
+    if absences and paper_refs:
+        for i, absence in enumerate(absences[:5]):
+            paper_ref = paper_refs[i % len(paper_refs)] if paper_refs else "(see PAPERS.md)"
+            lines.append(f"**{absence}** (Severity: Improvement)")
+            lines.append(f"- Current: Not implemented in {repo_name}")
+            lines.append(f"- SOTA: {paper_ref}")
+            lines.append(f"- Impact: Adding {absence.lower()} could improve model performance.")
+            lines.append("")
+    else:
+        lines.append("See TECHNIQUES.md Notable Absences and PAPERS.md for details.")
+        lines.append("")
+
+    lines += [
+        "## Improvement Opportunities",
+        "Review PAPERS.md High Relevance Papers for upgrade paths for detected techniques.",
+        "",
+        "## Experimental Suggestions",
+        "Implement the Notable Absences listed in TECHNIQUES.md.",
+        "See PAPERS.md Gap Papers for relevant research with implementation guidance.",
+    ]
+
+    return "\n".join(lines)
+
+
 def run_sage_pipeline(
     session: "SAGESession",
     env: dict,
@@ -421,12 +617,14 @@ def run_sage_pipeline(
 ) -> tuple[int, str]:
     """Run the 3-step SAGE pipeline using sequential gitclaw --prompt calls.
 
-    Step 1 — TECHNIQUES.md: gitnexus data pre-fetched in Python, injected
-      into prompt so model writes real file:line refs (no hallucination).
-    Step 2 — PAPERS.md: TECHNIQUES.md content injected; model calls arxiv-search.
-    Step 3 — GAPS.md: both files injected; model writes gap analysis with citations.
+    All external data is pre-fetched in Python before any gitclaw call:
+    Step 1 — TECHNIQUES.md: gitnexus queries run in Python → formatted text injected.
+    Step 2 — PAPERS.md: arXiv API called in Python → paper list injected.
+    Step 3 — GAPS.md: both files injected as context.
 
-    Each step is a single --prompt invocation that exits after one LLM turn.
+    Each step's model only needs to call write() once — no tool failures possible.
+    Fallbacks ensure all 3 files are always written even if the model produces
+    text instead of a tool call.
     """
     full_log = [""]  # mutable container for thread-safe accumulation
 
@@ -442,14 +640,15 @@ def run_sage_pipeline(
     techniques_path = session.session_dir / "TECHNIQUES.md"
     techniques_md = techniques_path.read_text(encoding="utf-8") if techniques_path.exists() else ""
     if not techniques_md:
-        # Fallback: synthesize a minimal TECHNIQUES.md from the raw gitnexus data
+        # Fallback: synthesize TECHNIQUES.md from raw gitnexus data
         techniques_md = f"# Techniques in {session.repo_name}\n\n{gitnexus_data[:3000]}"
         techniques_path.write_text(techniques_md, encoding="utf-8")
-        log_fn(full_log[0] + "\n⚠️ TECHNIQUES.md not written by model — using raw AST data as fallback.")
+        log_fn(full_log[0] + "\n⚠️ TECHNIQUES.md not written by model — using raw AST data.")
 
-    # ── Step 2: arXiv hunt — inject techniques, write PAPERS.md ──────────────
-    log_fn(full_log[0] + f"\n[Step 2/3] Searching arXiv for relevant papers...")
-    step2_prompt = build_step2_prompt(session.repo_name, techniques_md[:3000])
+    # ── Step 2: arXiv papers — pre-fetch in Python, model only writes PAPERS.md ─
+    log_fn(full_log[0] + f"\n[Step 2/3] Fetching arXiv papers...")
+    papers_text = run_arxiv_searches_local(techniques_md, session.repo_name, log_fn)
+    step2_prompt = build_step2_prompt(session.repo_name, papers_text)
     _run_gitclaw_step(
         session.session_dir, env, model, step2_prompt,
         "Step 2: PAPERS.md", log_fn, full_log,
@@ -458,9 +657,10 @@ def run_sage_pipeline(
     papers_path = session.session_dir / "PAPERS.md"
     papers_md = papers_path.read_text(encoding="utf-8") if papers_path.exists() else ""
     if not papers_md:
-        papers_md = "# Papers\n\n(arXiv search returned no results)"
+        # Fallback: write PAPERS.md directly from pre-fetched data
+        papers_md = f"# Papers\n\n{papers_text}"
         papers_path.write_text(papers_md, encoding="utf-8")
-        log_fn(full_log[0] + "\n⚠️ PAPERS.md not written by model — using placeholder.")
+        log_fn(full_log[0] + "\n⚠️ PAPERS.md not written by model — using pre-fetched data.")
 
     # ── Step 3: Gap analysis — inject both files, write GAPS.md ──────────────
     log_fn(full_log[0] + f"\n[Step 3/3] Writing gap analysis...")
@@ -471,6 +671,13 @@ def run_sage_pipeline(
         session.session_dir, env, model, step3_prompt,
         "Step 3: GAPS.md", log_fn, full_log,
     )
+
+    gaps_path = session.session_dir / "GAPS.md"
+    if not gaps_path.exists():
+        # Fallback: synthesize GAPS.md from pre-fetched data without LLM
+        gaps_md = _synthesize_gaps_fallback(session.repo_name, techniques_md, papers_md)
+        gaps_path.write_text(gaps_md, encoding="utf-8")
+        log_fn(full_log[0] + "\n⚠️ GAPS.md not written by model — using synthesized fallback.")
 
     return rc, full_log[0]
 

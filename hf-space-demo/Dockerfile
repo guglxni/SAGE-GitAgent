@@ -28,7 +28,7 @@ RUN npx -y gitnexus@1.5.3 --version 2>/dev/null || \
 
 # ── Python dependencies ────────────────────────────────────────────────────
 ENV UV_SYSTEM_PYTHON=1
-RUN uv pip install streamlit
+RUN uv pip install streamlit httpx
 
 # ── Verify agent files ─────────────────────────────────────────────────────
 RUN ls /app/agent.yaml /app/SOUL.md /app/RULES.md /app/tools /app/src \
