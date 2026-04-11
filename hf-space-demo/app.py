@@ -8,16 +8,24 @@ Architecture:
   - Custom providers use GITCLAW_MODEL_BASE_URL (not OPENAI_BASE_URL).
   - gitnexus@1.5.3 is pre-cached in the Docker image.
 
-Pipeline:
-  gitclaw --prompt is single-turn: one invocation = one LLM turn.
-  To guarantee all 3 reports, we run 3 sequential focused gitclaw calls:
-    Step 1 → TECHNIQUES.md  (AST scan via gitnexus)
-    Step 2 → PAPERS.md      (arXiv search, reads TECHNIQUES.md)
-    Step 3 → GAPS.md        (gap analysis, reads TECHNIQUES.md + PAPERS.md)
+Pipeline (3 sequential --prompt calls):
+  Step 1 → TECHNIQUES.md:
+    - We run gitnexus queries in Python and inject the raw JSON into the prompt.
+    - Model writes TECHNIQUES.md from real AST data (no hallucination).
+  Step 2 → PAPERS.md:
+    - We inject TECHNIQUES.md content into the prompt.
+    - Model calls arxiv-search and writes PAPERS.md.
+  Step 3 → GAPS.md:
+    - We inject both TECHNIQUES.md + PAPERS.md into the prompt.
+    - Model writes GAPS.md cross-referencing implementation vs SOTA papers.
+
+  Using --prompt (single-turn) for each step guarantees clean exit and
+  avoids REPL multi-line prompt parsing issues and hallucinated file paths.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -30,10 +38,12 @@ import streamlit as st
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 SAGE_APP_ROOT = Path("/app")
-SESSION_TIMEOUT = 400  # seconds (covers 3 steps × ~120s each)
+STEP_TIMEOUT = 150  # seconds per step (3 steps × 150s = 450s max total)
 
-SAGE_AGENT_FILES = ["agent.yaml", "SOUL.md", "RULES.md", "DUTIES.md", "AGENTS.md"]
-SAGE_AGENT_DIRS = ["skills", "tools", "src", "knowledge", "hooks", "agents", "config"]
+SAGE_AGENT_FILES = ["agent.yaml", "DUTIES.md", "AGENTS.md"]
+# SOUL.md and RULES.md come from hf-space-demo/ (simplified, no fetch-abstract/paper-verifier mandates)
+SAGE_DEMO_ROOT = Path(__file__).parent  # hf-space-demo/
+SAGE_AGENT_DIRS = ["tools", "src", "knowledge"]  # no skills — prevents SKILL MATCH hooks hijacking prompts
 
 # Provider configurations — model strings match pi-ai's registry exactly.
 PROVIDERS: dict[str, dict] = {
@@ -98,12 +108,24 @@ class SAGESession:
         self.repo_name: str = ""
 
     def setup(self) -> None:
-        """Copy SAGE agent files into the isolated session directory."""
+        """Copy SAGE agent files into the isolated session directory.
+
+        Uses simplified SOUL.md + RULES.md from hf-space-demo/ so the agent
+        isn't blocked by the full SAGE rules (fetch-abstract mandates, paper-verifier
+        delegation, domain restrictions) that prevent demo-speed operation.
+        """
         self.session_dir.mkdir(parents=True, exist_ok=True)
+        # Copy simplified soul/rules from demo dir first
+        for fname in ["SOUL.md", "RULES.md"]:
+            src = SAGE_DEMO_ROOT / fname
+            if src.exists():
+                shutil.copy2(src, self.session_dir / fname)
+        # Copy remaining agent definition files from app root
         for fname in SAGE_AGENT_FILES:
             src = SAGE_APP_ROOT / fname
             if src.exists():
                 shutil.copy2(src, self.session_dir / fname)
+        # Copy tools + knowledge (no skills — avoids SKILL MATCH hook hijacking)
         for dname in SAGE_AGENT_DIRS:
             src = SAGE_APP_ROOT / dname
             dst = self.session_dir / dname
@@ -175,40 +197,71 @@ def build_provider_env(
     return env, gitclaw_model
 
 
-# ── Prompt Template ───────────────────────────────────────────────────────────
+# ── Prompt Templates ──────────────────────────────────────────────────────────
 
-def build_prompt(repo_name: str) -> str:
-    """Single REPL-mode prompt covering the full SAGE pipeline.
+def build_step1_prompt(repo_name: str, gitnexus_json: str) -> str:
+    """Step 1: Write TECHNIQUES.md from pre-fetched gitnexus AST data.
 
-    Sent once via stdin. The agent runs multi-tool, multi-step in one turn.
-    Verified working in local tests (~65s for all 3 reports).
+    We inject the raw gitnexus JSON directly so the model writes real file:line
+    references instead of hallucinating paths.
     """
-    return f"""Analyze the ML codebase '{repo_name}' (indexed in gitnexus as repo '{repo_name}').
+    return (
+        f"You are SAGE, an ML research intelligence agent.\n\n"
+        f"Here is the AST knowledge graph data for the '{repo_name}' codebase "
+        f"(queried via gitnexus):\n\n{gitnexus_json}\n\n"
+        f"Write TECHNIQUES.md with two sections:\n"
+        f"1. ## Detected Techniques — for each technique found in the data above, "
+        f"list: technique name, exact file:line from the data, brief description.\n"
+        f"2. ## Notable Absences — standard ML patterns for this architecture type "
+        f"that are NOT present in the data above (these are the highest-value gaps).\n\n"
+        f"Call write(path=\"TECHNIQUES.md\") with this content."
+    )
 
-You are SAGE — your mission is to scan this codebase, cross-reference against arXiv research papers, \
-and surface concrete implementation gaps where the code diverges from state-of-the-art.
 
-Complete all 3 steps and write all 3 files:
+def build_step2_prompt(repo_name: str, techniques_md: str) -> str:
+    """Step 2: Search arXiv based on TECHNIQUES.md content, write PAPERS.md."""
+    return (
+        f"You are SAGE, an ML research intelligence agent. Your task has TWO parts.\n\n"
+        f"PART A — Search: The '{repo_name}' codebase has these techniques:\n\n{techniques_md}\n\n"
+        f"Call arxiv-search THREE times (one per line below):\n"
+        f"1. Search for the main architecture type above (e.g. 'GPT transformer language model')\n"
+        f"2. Search for the training technique above (e.g. 'AdamW optimizer transformer training')\n"
+        f"3. Search for ONE notable absence above (e.g. 'gradient clipping transformers')\n\n"
+        f"PART B — Write: After ALL three searches complete, call write(path=\"PAPERS.md\") "
+        f"with a markdown file listing the papers. "
+        f"Use ## High Relevance Papers for architecture/training papers "
+        f"and ## Gap Papers for the absence search. "
+        f"Each entry: paper title, arxiv:XXXX.XXXXX, year, one sentence on relevance to {repo_name}.\n\n"
+        f"IMPORTANT: You MUST end by calling the write tool. Do not just write text."
+    )
 
-STEP 1 — SCAN: Call gitnexus-query 3 times (always pass repo="{repo_name}"):
-  • "nn.Module transformer architecture classes"
-  • "optimizer loss function training loop"
-  • "attention mechanism positional encoding embedding"
-Then write(path="TECHNIQUES.md") listing:
-  - Detected Techniques: name, file:line, description
-  - Notable Absences: standard patterns missing for this architecture
 
-STEP 2 — PAPERS: Call arxiv-search 3 times — for the core architecture, the main training technique, \
-and ONE notable absence from TECHNIQUES.md (missing techniques = highest-value gaps).
-Then write(path="PAPERS.md") with High Relevance papers and Gap Papers (for absences).
+def build_step3_prompt(repo_name: str, techniques_md: str, papers_md: str) -> str:
+    """Step 3: Cross-reference TECHNIQUES.md + PAPERS.md to write GAPS.md.
 
-STEP 3 — GAPS (primary deliverable): write(path="GAPS.md") with:
-  - Summary: techniques detected, papers cross-referenced, gaps found
-  - Critical Gaps: current impl (file:line) vs SOTA paper (arxiv:ID) — specific and actionable
-  - Improvement Opportunities: existing techniques that papers show can be upgraded
-  - Experimental Suggestions: missing techniques worth exploring, with arxiv citations
-
-Do not stop until all 3 files are written."""
+    Prompt is structured as a direct file-write command to prevent the model
+    from outputting analysis as text instead of calling write().
+    """
+    return (
+        f"Call write(path=\"GAPS.md\") with a detailed markdown gap analysis for '{repo_name}'.\n\n"
+        f"Use this exact structure:\n\n"
+        f"## Summary\n"
+        f"X techniques detected in {repo_name}, Y papers cross-referenced, Z gaps identified.\n\n"
+        f"## Critical Gaps\n"
+        f"For each gap write: **Gap name** (Severity: Critical/Improvement/Experimental)\n"
+        f"- Current: what the code does now, with file:line reference\n"
+        f"- SOTA: what the paper recommends (arxiv:ID — paper title)\n"
+        f"- Impact: one sentence on the performance/quality benefit\n\n"
+        f"## Improvement Opportunities\n"
+        f"For each opportunity: **Technique name** — how it can be upgraded based on arxiv:ID\n\n"
+        f"## Experimental Suggestions\n"
+        f"For each suggestion: **Missing technique** (arxiv:ID) — 2 sentences on expected benefit\n\n"
+        f"---\n"
+        f"DATA — TECHNIQUES.md:\n{techniques_md}\n\n"
+        f"DATA — PAPERS.md:\n{papers_md}\n\n"
+        f"Now call write(path=\"GAPS.md\") immediately with the complete gap analysis. "
+        f"Do not output text — only call the write tool."
+    )
 
 
 # ── Pipeline Execution ────────────────────────────────────────────────────────
@@ -221,6 +274,76 @@ def clone_repo(repo_url: str, clone_dir: Path, status_fn) -> None:
     )
     if result.returncode != 0:
         raise RuntimeError(f"Clone failed: {result.stderr[:300]}")
+
+
+def _gitnexus_json_to_text(query: str, raw_json: str) -> str:
+    """Convert gitnexus JSON output to a clean markdown-friendly text block.
+
+    The raw JSON confuses models into writing JSON instead of markdown.
+    We convert to readable bullet-point text so models produce correct output.
+    """
+    try:
+        data = json.loads(raw_json)
+    except json.JSONDecodeError:
+        return f"Query: {query}\n  (unparseable output)"
+
+    lines = [f"Query: {query}"]
+
+    # Definitions: classes, functions, files with file paths and line numbers
+    for defn in data.get("definitions", [])[:15]:
+        name = defn.get("name", "?")
+        file_path = defn.get("filePath", "?")
+        start = defn.get("startLine")
+        end = defn.get("endLine")
+        module = defn.get("module", "")
+        loc = f":{start}" if start else ""
+        if end and end != start:
+            loc = f":{start}-{end}"
+        mod_tag = f" [{module}]" if module else ""
+        lines.append(f"  - {name} ({file_path}{loc}){mod_tag}")
+
+    # Process symbols with execution flow info
+    for sym in data.get("process_symbols", [])[:8]:
+        name = sym.get("name", "?")
+        file_path = sym.get("filePath", "?")
+        start = sym.get("startLine", "")
+        end = sym.get("endLine", "")
+        loc = f":{start}-{end}" if start and end else f":{start}" if start else ""
+        lines.append(f"  - {name} ({file_path}{loc}) [execution flow]")
+
+    if len(lines) == 1:
+        lines.append("  (no matching symbols found)")
+
+    return "\n".join(lines)
+
+
+def run_gitnexus_queries_local(repo_name: str, status_fn) -> str:
+    """Run 3 gitnexus queries in Python and return clean human-readable text.
+
+    Runs from any cwd — gitnexus uses its global registry keyed by repo name.
+    Returns formatted text (not raw JSON) ready to inject into the Step 1 prompt.
+    """
+    queries = [
+        "transformer model classes attention architecture",
+        "optimizer training loop loss function",
+        "positional encoding embedding layers normalization",
+    ]
+    parts = []
+    for q in queries:
+        try:
+            result = subprocess.run(
+                ["npx", "-y", "gitnexus@1.5.3", "query", q, "--repo", repo_name],
+                capture_output=True, text=True, timeout=60,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                parts.append(_gitnexus_json_to_text(q, result.stdout))
+            else:
+                parts.append(f"Query: {q}\n  (no results)")
+        except Exception as e:
+            parts.append(f"Query: {q}\n  (error: {e})")
+    combined = "\n\n".join(parts)
+    status_fn(f"AST queries complete ({len(parts)} queries, {len(combined)} chars).")
+    return combined
 
 
 def run_gitnexus_analyze(clone_dir: Path, status_fn) -> None:
@@ -241,26 +364,29 @@ def run_gitnexus_analyze(clone_dir: Path, status_fn) -> None:
                 break
 
 
-def run_sage_pipeline(
-    session: "SAGESession",
+def _run_gitclaw_step(
+    session_dir: Path,
     env: dict,
     model: str,
+    prompt: str,
+    step_label: str,
     log_fn,
-) -> tuple[int, str]:
-    """Run gitclaw in REPL mode with the full pipeline prompt sent via stdin.
+    full_log_ref: list,
+) -> int:
+    """Run one gitclaw --prompt invocation (single-turn) and stream its output.
 
-    gitclaw --prompt is single-turn (one LLM completion then process exits).
-    REPL mode (no --prompt flag) allows the agent to call multiple tools
-    across the full scan → papers → gaps pipeline in one conversation turn.
-
-    Completion is detected by watching for GAPS.md to appear on disk,
-    falling back to SESSION_TIMEOUT if it never appears.
+    gitclaw --prompt exits automatically after one LLM turn + tool calls.
+    The prompt is passed via --prompt flag (no stdin/REPL issues).
     """
-    cmd = ["gitclaw", "--dir", str(session.session_dir), "-m", model]
+    cmd = [
+        "gitclaw",
+        "--dir", str(session_dir),
+        "-m", model,
+        "--prompt", prompt,
+    ]
     process = subprocess.Popen(
         cmd,
-        cwd=str(session.session_dir),
-        stdin=subprocess.PIPE,
+        cwd=str(session_dir),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -268,61 +394,85 @@ def run_sage_pipeline(
         bufsize=1,
     )
 
-    full_log = ""
-    gaps_complete = threading.Event()
-
-    def _stream() -> None:
-        nonlocal full_log
+    def _read() -> None:
         for line in iter(process.stdout.readline, ""):
-            full_log += line
-            log_fn(full_log)
-            # Detect GAPS.md written (gitclaw prints "Wrote N bytes to GAPS.md")
-            if "GAPS.md" in line and ("wrote" in line.lower() or "bytes" in line.lower()):
-                gaps_complete.set()
+            full_log_ref[0] += line
+            log_fn(f"[{step_label}]\n" + full_log_ref[0])
         process.stdout.close()
 
-    reader = threading.Thread(target=_stream, daemon=True)
+    reader = threading.Thread(target=_read, daemon=True)
     reader.start()
 
-    # Wait for gitclaw's REPL to initialize and print welcome message
-    time.sleep(3)
-
-    # Send the full pipeline prompt
-    prompt = build_prompt(session.repo_name)
     try:
-        process.stdin.write(prompt + "\n\n")
-        process.stdin.flush()
-    except BrokenPipeError:
-        pass
-
-    # Primary completion signal: GAPS.md exists on disk
-    # Fallback: SESSION_TIMEOUT
-    deadline = time.time() + SESSION_TIMEOUT
-    while time.time() < deadline:
-        if (session.session_dir / "GAPS.md").exists():
-            time.sleep(2)  # Let agent finish any trailing writes
-            break
-        if gaps_complete.is_set():
-            time.sleep(1)
-            break
-        time.sleep(1)
-
-    # Gracefully quit the REPL
-    try:
-        process.stdin.write("/quit\n")
-        process.stdin.flush()
-        process.stdin.close()
-    except (BrokenPipeError, OSError):
-        pass
-
-    try:
-        process.wait(timeout=15)
+        process.wait(timeout=STEP_TIMEOUT)
     except subprocess.TimeoutExpired:
         process.terminate()
-        process.wait(timeout=5)
+        process.wait(timeout=10)
 
     reader.join(timeout=5)
-    return process.returncode, full_log
+    return process.returncode
+
+
+def run_sage_pipeline(
+    session: "SAGESession",
+    env: dict,
+    model: str,
+    log_fn,
+) -> tuple[int, str]:
+    """Run the 3-step SAGE pipeline using sequential gitclaw --prompt calls.
+
+    Step 1 — TECHNIQUES.md: gitnexus data pre-fetched in Python, injected
+      into prompt so model writes real file:line refs (no hallucination).
+    Step 2 — PAPERS.md: TECHNIQUES.md content injected; model calls arxiv-search.
+    Step 3 — GAPS.md: both files injected; model writes gap analysis with citations.
+
+    Each step is a single --prompt invocation that exits after one LLM turn.
+    """
+    full_log = [""]  # mutable container for thread-safe accumulation
+
+    # ── Step 1: AST scan — fetch gitnexus data in Python, write TECHNIQUES.md ─
+    log_fn("[Step 1/3] Fetching AST data from gitnexus...")
+    gitnexus_data = run_gitnexus_queries_local(session.repo_name, log_fn)
+    step1_prompt = build_step1_prompt(session.repo_name, gitnexus_data)
+    _run_gitclaw_step(
+        session.session_dir, env, model, step1_prompt,
+        "Step 1: TECHNIQUES.md", log_fn, full_log,
+    )
+
+    techniques_path = session.session_dir / "TECHNIQUES.md"
+    techniques_md = techniques_path.read_text(encoding="utf-8") if techniques_path.exists() else ""
+    if not techniques_md:
+        # Fallback: synthesize a minimal TECHNIQUES.md from the raw gitnexus data
+        techniques_md = f"# Techniques in {session.repo_name}\n\n{gitnexus_data[:3000]}"
+        techniques_path.write_text(techniques_md, encoding="utf-8")
+        log_fn(full_log[0] + "\n⚠️ TECHNIQUES.md not written by model — using raw AST data as fallback.")
+
+    # ── Step 2: arXiv hunt — inject techniques, write PAPERS.md ──────────────
+    log_fn(full_log[0] + f"\n[Step 2/3] Searching arXiv for relevant papers...")
+    step2_prompt = build_step2_prompt(session.repo_name, techniques_md[:3000])
+    _run_gitclaw_step(
+        session.session_dir, env, model, step2_prompt,
+        "Step 2: PAPERS.md", log_fn, full_log,
+    )
+
+    papers_path = session.session_dir / "PAPERS.md"
+    papers_md = papers_path.read_text(encoding="utf-8") if papers_path.exists() else ""
+    if not papers_md:
+        papers_md = "# Papers\n\n(arXiv search returned no results)"
+        papers_path.write_text(papers_md, encoding="utf-8")
+        log_fn(full_log[0] + "\n⚠️ PAPERS.md not written by model — using placeholder.")
+
+    # ── Step 3: Gap analysis — inject both files, write GAPS.md ──────────────
+    log_fn(full_log[0] + f"\n[Step 3/3] Writing gap analysis...")
+    step3_prompt = build_step3_prompt(
+        session.repo_name, techniques_md[:3000], papers_md[:3000]
+    )
+    rc = _run_gitclaw_step(
+        session.session_dir, env, model, step3_prompt,
+        "Step 3: GAPS.md", log_fn, full_log,
+    )
+
+    return rc, full_log[0]
 
 
 def collect_reports(session: SAGESession) -> dict[str, str]:
@@ -509,7 +659,7 @@ if run_clicked:
             st.error(f"**Error:** {e}")
         except subprocess.TimeoutExpired:
             st.error(
-                f"⏱️ Analysis timed out (limit: {SESSION_TIMEOUT}s across 3 steps). "
+                f"⏱️ A pipeline step timed out (limit: {STEP_TIMEOUT}s per step). "
                 "Try a smaller repository or a faster model (Llama 3.1 8B Instant)."
             )
         except Exception as e:
