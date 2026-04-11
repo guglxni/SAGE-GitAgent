@@ -21,6 +21,8 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -175,90 +177,38 @@ def build_provider_env(
 
 # ── Prompt Template ───────────────────────────────────────────────────────────
 
-def prompt_scan(repo_name: str) -> str:
-    return f"""You are SAGE step 1/3. Your ONLY job: scan the ML codebase '{repo_name}' and write TECHNIQUES.md.
+def build_prompt(repo_name: str) -> str:
+    """Single REPL-mode prompt covering the full SAGE pipeline.
 
-The codebase is indexed in gitnexus under repo name '{repo_name}'.
+    Sent once via stdin. The agent runs multi-tool, multi-step in one turn.
+    Verified working in local tests (~65s for all 3 reports).
+    """
+    return f"""Analyze the ML codebase '{repo_name}' (indexed in gitnexus as repo '{repo_name}').
 
-Run these 4 gitnexus-query calls (include repo="{repo_name}" in each):
-  1. query="model architecture classes nn.Module transformer"
-  2. query="optimizer AdamW SGD learning rate scheduler"
-  3. query="loss function cross entropy training loop"
-  4. query="attention mechanism positional encoding embedding"
+You are SAGE — your mission is to scan this codebase, cross-reference against arXiv research papers, \
+and surface concrete implementation gaps where the code diverges from state-of-the-art.
 
-Then call write(path="TECHNIQUES.md") with this exact structure:
-# ML Techniques in {repo_name}
+Complete all 3 steps and write all 3 files:
 
-## Detected Techniques
-- **[TechniqueName]** — `file:line` — [what it does, key hyperparameters]
-[one entry per technique found across all 4 queries]
+STEP 1 — SCAN: Call gitnexus-query 3 times (always pass repo="{repo_name}"):
+  • "nn.Module transformer architecture classes"
+  • "optimizer loss function training loop"
+  • "attention mechanism positional encoding embedding"
+Then write(path="TECHNIQUES.md") listing:
+  - Detected Techniques: name, file:line, description
+  - Notable Absences: standard patterns missing for this architecture
 
-## Notable Absences
-- **[MissingTechnique]** — expected for [architecture type]; absence means [risk/limitation]
-[list standard patterns missing for this architecture — these become gaps in step 3]
+STEP 2 — PAPERS: Call arxiv-search 3 times — for the core architecture, the main training technique, \
+and ONE notable absence from TECHNIQUES.md (missing techniques = highest-value gaps).
+Then write(path="PAPERS.md") with High Relevance papers and Gap Papers (for absences).
 
-Call write() now with real content. Task complete once TECHNIQUES.md is written."""
+STEP 3 — GAPS (primary deliverable): write(path="GAPS.md") with:
+  - Summary: techniques detected, papers cross-referenced, gaps found
+  - Critical Gaps: current impl (file:line) vs SOTA paper (arxiv:ID) — specific and actionable
+  - Improvement Opportunities: existing techniques that papers show can be upgraded
+  - Experimental Suggestions: missing techniques worth exploring, with arxiv citations
 
-
-def prompt_papers(repo_name: str) -> str:
-    return f"""You are SAGE step 2/3. Your ONLY job: read TECHNIQUES.md and find relevant arXiv papers, then write PAPERS.md.
-
-First call read(path="TECHNIQUES.md") to see what was detected and what absences were noted.
-
-Then call arxiv-search 3 times:
-  1. Search for the core architecture/model type detected in TECHNIQUES.md
-  2. Search for the primary training technique or optimizer detected
-  3. Search for ONE of the notable absences from TECHNIQUES.md (missing techniques = highest-value gaps)
-
-Then call write(path="PAPERS.md") with this exact structure:
-# Relevant arXiv Papers for {repo_name}
-
-## High Relevance — Detected Techniques
-- **arxiv:[ID]** — [Paper Title] ([Year])
-  - Technique: [which technique from TECHNIQUES.md]
-  - Why relevant: [one sentence on direct applicability to this codebase]
-
-## Gap Papers — Notable Absences
-- **arxiv:[ID]** — [Paper Title] ([Year])
-  - Missing technique: [which absence from TECHNIQUES.md]
-  - What it enables: [concrete benefit if implemented]
-
-Call write() now with real content from your arxiv searches. Task complete once PAPERS.md is written."""
-
-
-def prompt_gaps(repo_name: str) -> str:
-    return f"""You are SAGE step 3/3 — the primary deliverable. Your ONLY job: read TECHNIQUES.md and PAPERS.md, then write GAPS.md.
-
-SAGE's mission: bridge applied ML engineering against theoretical research. This report shows exactly where '{repo_name}' diverges from state-of-the-art papers.
-
-First call read(path="TECHNIQUES.md") then read(path="PAPERS.md") to load the prior steps.
-
-Then call write(path="GAPS.md") with this structure:
-# Research Gap Analysis: {repo_name}
-
-> SAGE scans ML codebases, cross-references against arXiv papers, and surfaces concrete implementation gaps.
-
-## Summary
-- Techniques detected: [N from TECHNIQUES.md]
-- Papers cross-referenced: [N from PAPERS.md]
-- Gaps identified: [N Critical | N Improvement | N Experimental]
-
-## Critical Gaps
-For each high-relevance paper in PAPERS.md whose technique is absent or outdated in the codebase:
-### [Gap Name]
-- **Current implementation**: `file:line` uses [X approach] — [limitation]
-- **SOTA recommendation**: [Paper Title] (arxiv:[ID]) proposes [Y] — expected improvement: [concrete metric or capability]
-- **Fix complexity**: [Low/Medium/High]
-
-## Improvement Opportunities
-For detected techniques that exist but could be enhanced based on papers:
-- **[Technique]**: currently uses [A], paper arxiv:[ID] shows [B] improves [metric] by [amount]
-
-## Experimental Suggestions
-From the Gap Papers section in PAPERS.md — techniques not yet in the codebase worth exploring:
-- **[Missing Technique]** (arxiv:[ID]): [one sentence on what it adds and why it fits this architecture]
-
-Call write() now with specific, cited content. Task complete once GAPS.md is written."""
+Do not stop until all 3 files are written."""
 
 
 # ── Pipeline Execution ────────────────────────────────────────────────────────
@@ -291,74 +241,88 @@ def run_gitnexus_analyze(clone_dir: Path, status_fn) -> None:
                 break
 
 
-STEP_TIMEOUT = 120  # seconds per step — 3 steps × 120s = 360s max
-
-
-def _run_gitclaw_step(
-    step_num: int,
-    step_label: str,
-    prompt: str,
-    session: "SAGESession",
-    env: dict,
-    model: str,
-    log_fn,
-    full_log: str,
-) -> tuple[int, str]:
-    """Run a single focused gitclaw --prompt invocation. Returns (returncode, full_log)."""
-    separator = f"\n{'─'*60}\n🔄 STEP {step_num}/3: {step_label}\n{'─'*60}\n"
-    full_log += separator
-    log_fn(full_log)
-
-    cmd = ["gitclaw", "--dir", str(session.session_dir), "-m", model, "--prompt", prompt]
-    process = subprocess.Popen(
-        cmd,
-        cwd=str(session.session_dir),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        env=env,
-        bufsize=1,
-    )
-    for line in iter(process.stdout.readline, ""):
-        full_log += line
-        log_fn(full_log)
-    process.stdout.close()
-    process.wait(timeout=STEP_TIMEOUT)
-    return process.returncode, full_log
-
-
 def run_sage_pipeline(
     session: "SAGESession",
     env: dict,
     model: str,
     log_fn,
 ) -> tuple[int, str]:
-    """Run 3 sequential focused gitclaw calls — one per report file.
+    """Run gitclaw in REPL mode with the full pipeline prompt sent via stdin.
 
-    gitclaw --prompt is single-turn (one LLM completion per invocation).
-    Running 3 separate calls guarantees all 3 reports are generated:
-      Step 1 → TECHNIQUES.md  (AST scan)
-      Step 2 → PAPERS.md      (arXiv search, reads TECHNIQUES.md)
-      Step 3 → GAPS.md        (gap analysis, reads both prior reports)
+    gitclaw --prompt is single-turn (one LLM completion then process exits).
+    REPL mode (no --prompt flag) allows the agent to call multiple tools
+    across the full scan → papers → gaps pipeline in one conversation turn.
+
+    Completion is detected by watching for GAPS.md to appear on disk,
+    falling back to SESSION_TIMEOUT if it never appears.
     """
+    cmd = ["gitclaw", "--dir", str(session.session_dir), "-m", model]
+    process = subprocess.Popen(
+        cmd,
+        cwd=str(session.session_dir),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=env,
+        bufsize=1,
+    )
+
     full_log = ""
-    steps = [
-        (1, "AST Scan → TECHNIQUES.md", prompt_scan(session.repo_name)),
-        (2, "arXiv Hunt → PAPERS.md", prompt_papers(session.repo_name)),
-        (3, "Gap Analysis → GAPS.md", prompt_gaps(session.repo_name)),
-    ]
-    last_rc = 0
-    for step_num, step_label, prompt in steps:
-        rc, full_log = _run_gitclaw_step(
-            step_num, step_label, prompt, session, env, model, log_fn, full_log
-        )
-        last_rc = rc
-        # Non-zero exit on step 1 or 2 is a hard failure; step 3 may still produce output
-        if rc != 0 and step_num < 3:
-            full_log += f"\n⚠️ Step {step_num} exited with code {rc} — aborting pipeline.\n"
+    gaps_complete = threading.Event()
+
+    def _stream() -> None:
+        nonlocal full_log
+        for line in iter(process.stdout.readline, ""):
+            full_log += line
             log_fn(full_log)
+            # Detect GAPS.md written (gitclaw prints "Wrote N bytes to GAPS.md")
+            if "GAPS.md" in line and ("wrote" in line.lower() or "bytes" in line.lower()):
+                gaps_complete.set()
+        process.stdout.close()
+
+    reader = threading.Thread(target=_stream, daemon=True)
+    reader.start()
+
+    # Wait for gitclaw's REPL to initialize and print welcome message
+    time.sleep(3)
+
+    # Send the full pipeline prompt
+    prompt = build_prompt(session.repo_name)
+    try:
+        process.stdin.write(prompt + "\n\n")
+        process.stdin.flush()
+    except BrokenPipeError:
+        pass
+
+    # Primary completion signal: GAPS.md exists on disk
+    # Fallback: SESSION_TIMEOUT
+    deadline = time.time() + SESSION_TIMEOUT
+    while time.time() < deadline:
+        if (session.session_dir / "GAPS.md").exists():
+            time.sleep(2)  # Let agent finish any trailing writes
             break
-    return last_rc, full_log
+        if gaps_complete.is_set():
+            time.sleep(1)
+            break
+        time.sleep(1)
+
+    # Gracefully quit the REPL
+    try:
+        process.stdin.write("/quit\n")
+        process.stdin.flush()
+        process.stdin.close()
+    except (BrokenPipeError, OSError):
+        pass
+
+    try:
+        process.wait(timeout=15)
+    except subprocess.TimeoutExpired:
+        process.terminate()
+        process.wait(timeout=5)
+
+    reader.join(timeout=5)
+    return process.returncode, full_log
 
 
 def collect_reports(session: SAGESession) -> dict[str, str]:
@@ -505,7 +469,7 @@ if run_clicked:
                 display = full_log[-4000:] if len(full_log) > 4000 else full_log
                 log_container.code(display, language=None)
 
-            with st.spinner("SAGE pipeline running — 3 steps: AST scan → arXiv papers → gap analysis..."):
+            with st.spinner("SAGE pipeline running — scan → papers → gaps (up to ~3 min)..."):
                 returncode, full_log = run_sage_pipeline(session, env, gitclaw_model, update_log)
 
             # ── Phase 3: Display Reports ──────────────────────────────────
