@@ -37,9 +37,15 @@ import subprocess
 import threading
 import time
 import urllib.parse
+import urllib.request
 import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+try:
+    import httpx
+except ImportError:
+    httpx = None  # type: ignore[assignment]
 
 import streamlit as st
 
@@ -204,67 +210,108 @@ def build_provider_env(
     return env, gitclaw_model
 
 
-# ── Prompt Templates ──────────────────────────────────────────────────────────
+# ── Direct LLM API call (bypasses gitclaw tool dispatch) ──────────────────────
 
-def build_step1_prompt(repo_name: str, gitnexus_json: str) -> str:
-    """Step 1: Write TECHNIQUES.md from pre-fetched gitnexus AST data.
+def _call_llm_direct(env: dict, model: str, prompt: str) -> str:
+    """Call the LLM API directly and return the text response.
 
-    We inject the raw gitnexus JSON directly so the model writes real file:line
-    references instead of hallucinating paths.
+    model format: "provider:model-id" (e.g. "groq:llama-4-scout-17b")
+    Bypasses gitclaw entirely — no tool call schema confusion, no write() failures.
     """
+    provider_prefix, _, model_id = model.partition(":")
+
+    if provider_prefix == "anthropic":
+        api_key = env.get("ANTHROPIC_API_KEY", "")
+        url = "https://api.anthropic.com/v1/messages"
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+        data = {
+            "model": model_id,
+            "max_tokens": 4096,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        with httpx.Client(timeout=90.0) as client:
+            resp = client.post(url, headers=headers, json=data)
+            resp.raise_for_status()
+            return resp.json()["content"][0]["text"]
+    else:
+        # groq, openai, or custom (all OpenAI-compatible)
+        if provider_prefix == "groq":
+            base_url = "https://api.groq.com/openai/v1"
+            api_key = env.get("GROQ_API_KEY", "")
+        else:
+            custom = env.get("GITCLAW_MODEL_BASE_URL", "")
+            base_url = custom if custom else "https://api.openai.com/v1"
+            api_key = env.get("OPENAI_API_KEY", "")
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        data = {
+            "model": model_id,
+            "max_tokens": 4096,
+            "temperature": 0.1,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        with httpx.Client(timeout=90.0) as client:
+            resp = client.post(f"{base_url}/chat/completions", headers=headers, json=data)
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+
+
+# ── Prompt Templates (output-only — no tool call instructions) ─────────────────
+
+def build_step1_prompt(repo_name: str, gitnexus_data: str) -> str:
     return (
-        f"You are SAGE, an ML research intelligence agent.\n\n"
-        f"Here is the AST knowledge graph data for the '{repo_name}' codebase "
-        f"(queried via gitnexus):\n\n{gitnexus_json}\n\n"
-        f"Write TECHNIQUES.md with two sections:\n"
-        f"1. ## Detected Techniques — for each technique found in the data above, "
-        f"list: technique name, exact file:line from the data, brief description.\n"
-        f"2. ## Notable Absences — standard ML patterns for this architecture type "
-        f"that are NOT present in the data above (these are the highest-value gaps).\n\n"
-        f"Call write(path=\"TECHNIQUES.md\") with this content."
+        f"You are SAGE, an ML research intelligence agent. "
+        f"Output ONLY the raw markdown for TECHNIQUES.md — no preamble, no explanation.\n\n"
+        f"AST knowledge graph data for '{repo_name}':\n{gitnexus_data}\n\n"
+        f"Write a markdown file with exactly these two sections:\n\n"
+        f"## Detected Techniques\n"
+        f"For each technique found above: **Name** — `file:line` — brief description.\n\n"
+        f"## Notable Absences\n"
+        f"Standard ML patterns for this architecture NOT found above. "
+        f"These are the highest-value research gaps. List 4-6 specific techniques."
     )
 
 
 def build_step2_prompt(repo_name: str, papers_text: str) -> str:
-    """Step 2: arXiv papers pre-fetched in Python, model only writes PAPERS.md."""
     return (
-        f"Call write(path=\"PAPERS.md\") with a markdown file listing these arXiv papers "
-        f"relevant to the '{repo_name}' ML codebase.\n\n"
-        f"The papers were retrieved from the arXiv API:\n\n{papers_text}\n\n"
-        f"Format PAPERS.md with:\n"
+        f"You are SAGE, an ML research intelligence agent. "
+        f"Output ONLY the raw markdown for PAPERS.md — no preamble, no explanation.\n\n"
+        f"These papers were retrieved from arXiv for the '{repo_name}' codebase:\n{papers_text}\n\n"
+        f"Write a markdown file with exactly these two sections:\n\n"
         f"## High Relevance Papers\n"
-        f"(architecture/training papers — title, arxiv:ID, year, one sentence on relevance)\n\n"
+        f"Architecture and training papers. For each: **Title** (arxiv:ID, year) — "
+        f"one sentence on relevance to {repo_name}.\n\n"
         f"## Gap Papers\n"
-        f"(papers for techniques NOT found in the codebase — explain the gap)\n\n"
-        f"Call write(path=\"PAPERS.md\") now. Do not output text."
+        f"Papers for techniques NOT in the codebase (from [notable-absence] entries above). "
+        f"For each: **Title** (arxiv:ID, year) — what gap it addresses."
     )
 
 
 def build_step3_prompt(repo_name: str, techniques_md: str, papers_md: str) -> str:
-    """Step 3: Cross-reference TECHNIQUES.md + PAPERS.md to write GAPS.md.
-
-    Prompt is structured as a direct file-write command to prevent the model
-    from outputting analysis as text instead of calling write().
-    """
     return (
-        f"Call write(path=\"GAPS.md\") with a detailed markdown gap analysis for '{repo_name}'.\n\n"
-        f"Use this exact structure:\n\n"
+        f"You are SAGE, an ML research intelligence agent. "
+        f"Output ONLY the raw markdown for GAPS.md — no preamble, no explanation.\n\n"
+        f"TECHNIQUES.md for '{repo_name}':\n{techniques_md}\n\n"
+        f"PAPERS.md:\n{papers_md}\n\n"
+        f"Write a markdown gap analysis with exactly these four sections:\n\n"
         f"## Summary\n"
-        f"X techniques detected in {repo_name}, Y papers cross-referenced, Z gaps identified.\n\n"
+        f"N techniques detected, M papers cross-referenced, K gaps identified.\n\n"
         f"## Critical Gaps\n"
-        f"For each gap write: **Gap name** (Severity: Critical/Improvement/Experimental)\n"
-        f"- Current: what the code does now, with file:line reference\n"
-        f"- SOTA: what the paper recommends (arxiv:ID — paper title)\n"
-        f"- Impact: one sentence on the performance/quality benefit\n\n"
+        f"For each gap: **Name** (Severity: Critical/Improvement/Experimental)\n"
+        f"- Current: what the code does (`file:line` from TECHNIQUES above)\n"
+        f"- SOTA: what the paper recommends (`arxiv:ID` from PAPERS above)\n"
+        f"- Impact: one sentence on the performance benefit\n\n"
         f"## Improvement Opportunities\n"
-        f"For each opportunity: **Technique name** — how it can be upgraded based on arxiv:ID\n\n"
+        f"Existing techniques the papers show can be upgraded. Cite `arxiv:ID`.\n\n"
         f"## Experimental Suggestions\n"
-        f"For each suggestion: **Missing technique** (arxiv:ID) — 2 sentences on expected benefit\n\n"
-        f"---\n"
-        f"DATA — TECHNIQUES.md:\n{techniques_md}\n\n"
-        f"DATA — PAPERS.md:\n{papers_md}\n\n"
-        f"Now call write(path=\"GAPS.md\") immediately with the complete gap analysis. "
-        f"Do not output text — only call the write tool."
+        f"Notable absences worth implementing. Each with `arxiv:ID` and expected benefit."
     )
 
 
@@ -402,8 +449,7 @@ def _fetch_arxiv(query: str, max_results: int = 4) -> list[dict]:
             resp.raise_for_status()
             return _parse_arxiv_xml(resp.text)
     except ImportError:
-        # Fallback to urllib if httpx not available
-        import urllib.request
+        # Fallback to stdlib urllib if httpx not available
         try:
             with urllib.request.urlopen(url, timeout=20) as resp:
                 return _parse_arxiv_xml(resp.read().decode("utf-8"))
@@ -615,71 +661,65 @@ def run_sage_pipeline(
     model: str,
     log_fn,
 ) -> tuple[int, str]:
-    """Run the 3-step SAGE pipeline using sequential gitclaw --prompt calls.
+    """Run the 3-step SAGE pipeline using direct LLM API calls.
 
-    All external data is pre-fetched in Python before any gitclaw call:
-    Step 1 — TECHNIQUES.md: gitnexus queries run in Python → formatted text injected.
-    Step 2 — PAPERS.md: arXiv API called in Python → paper list injected.
-    Step 3 — GAPS.md: both files injected as context.
+    All data is pre-fetched in Python; the LLM only formats/writes markdown.
+    No gitclaw tool dispatch — eliminates write() schema failures.
 
-    Each step's model only needs to call write() once — no tool failures possible.
-    Fallbacks ensure all 3 files are always written even if the model produces
-    text instead of a tool call.
+    Step 1 — TECHNIQUES.md: gitnexus data → LLM formats → written directly.
+    Step 2 — PAPERS.md: arXiv data pre-fetched → LLM formats → written directly.
+    Step 3 — GAPS.md: both files injected → LLM writes gap analysis → written directly.
+    Fallbacks ensure all 3 files exist even on LLM error.
     """
-    full_log = [""]  # mutable container for thread-safe accumulation
+    log_lines: list[str] = []
 
-    # ── Step 1: AST scan — fetch gitnexus data in Python, write TECHNIQUES.md ─
-    log_fn("[Step 1/3] Fetching AST data from gitnexus...")
-    gitnexus_data = run_gitnexus_queries_local(session.repo_name, log_fn)
-    step1_prompt = build_step1_prompt(session.repo_name, gitnexus_data)
-    _run_gitclaw_step(
-        session.session_dir, env, model, step1_prompt,
-        "Step 1: TECHNIQUES.md", log_fn, full_log,
-    )
+    def _log(msg: str) -> None:
+        log_lines.append(msg)
+        log_fn("\n".join(log_lines[-60:]))  # show last 60 lines
 
-    techniques_path = session.session_dir / "TECHNIQUES.md"
-    techniques_md = techniques_path.read_text(encoding="utf-8") if techniques_path.exists() else ""
-    if not techniques_md:
-        # Fallback: synthesize TECHNIQUES.md from raw gitnexus data
-        techniques_md = f"# Techniques in {session.repo_name}\n\n{gitnexus_data[:3000]}"
-        techniques_path.write_text(techniques_md, encoding="utf-8")
-        log_fn(full_log[0] + "\n⚠️ TECHNIQUES.md not written by model — using raw AST data.")
+    # ── Step 1: AST scan ──────────────────────────────────────────────────────
+    _log("[Step 1/3] Querying AST knowledge graph...")
+    gitnexus_data = run_gitnexus_queries_local(session.repo_name, _log)
 
-    # ── Step 2: arXiv papers — pre-fetch in Python, model only writes PAPERS.md ─
-    log_fn(full_log[0] + f"\n[Step 2/3] Fetching arXiv papers...")
-    papers_text = run_arxiv_searches_local(techniques_md, session.repo_name, log_fn)
-    step2_prompt = build_step2_prompt(session.repo_name, papers_text)
-    _run_gitclaw_step(
-        session.session_dir, env, model, step2_prompt,
-        "Step 2: PAPERS.md", log_fn, full_log,
-    )
+    _log("[Step 1/3] Generating TECHNIQUES.md...")
+    try:
+        techniques_md = _call_llm_direct(env, model, build_step1_prompt(session.repo_name, gitnexus_data))
+        _log(f"  TECHNIQUES.md: {len(techniques_md)} chars")
+    except Exception as e:
+        _log(f"  ⚠️ LLM call failed: {e} — using raw AST data")
+        techniques_md = f"# Techniques in {session.repo_name}\n\n{gitnexus_data}"
 
-    papers_path = session.session_dir / "PAPERS.md"
-    papers_md = papers_path.read_text(encoding="utf-8") if papers_path.exists() else ""
-    if not papers_md:
-        # Fallback: write PAPERS.md directly from pre-fetched data
+    (session.session_dir / "TECHNIQUES.md").write_text(techniques_md, encoding="utf-8")
+
+    # ── Step 2: arXiv papers ──────────────────────────────────────────────────
+    _log("[Step 2/3] Fetching arXiv papers...")
+    papers_text = run_arxiv_searches_local(techniques_md, session.repo_name, _log)
+
+    _log("[Step 2/3] Generating PAPERS.md...")
+    try:
+        papers_md = _call_llm_direct(env, model, build_step2_prompt(session.repo_name, papers_text))
+        _log(f"  PAPERS.md: {len(papers_md)} chars")
+    except Exception as e:
+        _log(f"  ⚠️ LLM call failed: {e} — using raw paper data")
         papers_md = f"# Papers\n\n{papers_text}"
-        papers_path.write_text(papers_md, encoding="utf-8")
-        log_fn(full_log[0] + "\n⚠️ PAPERS.md not written by model — using pre-fetched data.")
 
-    # ── Step 3: Gap analysis — inject both files, write GAPS.md ──────────────
-    log_fn(full_log[0] + f"\n[Step 3/3] Writing gap analysis...")
-    step3_prompt = build_step3_prompt(
-        session.repo_name, techniques_md[:3000], papers_md[:3000]
-    )
-    rc = _run_gitclaw_step(
-        session.session_dir, env, model, step3_prompt,
-        "Step 3: GAPS.md", log_fn, full_log,
-    )
+    (session.session_dir / "PAPERS.md").write_text(papers_md, encoding="utf-8")
 
-    gaps_path = session.session_dir / "GAPS.md"
-    if not gaps_path.exists():
-        # Fallback: synthesize GAPS.md from pre-fetched data without LLM
+    # ── Step 3: Gap analysis ──────────────────────────────────────────────────
+    _log("[Step 3/3] Writing gap analysis...")
+    try:
+        gaps_md = _call_llm_direct(
+            env, model,
+            build_step3_prompt(session.repo_name, techniques_md[:3000], papers_md[:3000])
+        )
+        _log(f"  GAPS.md: {len(gaps_md)} chars")
+    except Exception as e:
+        _log(f"  ⚠️ LLM call failed: {e} — using synthesized fallback")
         gaps_md = _synthesize_gaps_fallback(session.repo_name, techniques_md, papers_md)
-        gaps_path.write_text(gaps_md, encoding="utf-8")
-        log_fn(full_log[0] + "\n⚠️ GAPS.md not written by model — using synthesized fallback.")
 
-    return rc, full_log[0]
+    (session.session_dir / "GAPS.md").write_text(gaps_md, encoding="utf-8")
+
+    return 0, "\n".join(log_lines)
 
 
 def collect_reports(session: SAGESession) -> dict[str, str]:
