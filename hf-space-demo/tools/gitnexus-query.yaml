@@ -1,0 +1,40 @@
+name: gitnexus-query
+description: "Query the GitNexus AST knowledge graph for functions, classes, and architectural dependencies. Executes via npx with a pinned version."
+version: 2.0.0
+
+input_schema:
+  type: object
+  properties:
+    query:
+      type: string
+      description: "Semantic or structural query (e.g., 'PyTorch model classes', 'optimizer initializations', 'classes extending torch.nn.Module')"
+      maxLength: 500
+    repo:
+      type: string
+      description: "Repository name to target when multiple repos are indexed (e.g., 'minGPT'). Omit if only one repo is indexed."
+  required:
+    - query
+  additionalProperties: false
+
+output_schema:
+  type: object
+  properties:
+    results:
+      type: string
+      description: "AST query results as JSON — includes matched nodes, file paths, and line numbers"
+    error:
+      type: string
+      description: "Error message if the query failed"
+
+annotations:
+  read_only: true
+  local_only: true
+  no_auth_required: true
+  requires_runtime: nodejs
+  pinned_version: "gitnexus@1.5.3"
+  accessible_by:
+    - sage-agent
+
+implementation:
+  script: gitnexus-query.py
+  runtime: python3

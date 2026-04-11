@@ -37,12 +37,12 @@ from pathlib import Path
 import streamlit as st
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-SAGE_APP_ROOT = Path("/app")
 STEP_TIMEOUT = 150  # seconds per step (3 steps × 150s = 450s max total)
 
 SAGE_AGENT_FILES = ["agent.yaml", "DUTIES.md", "AGENTS.md"]
-# SOUL.md and RULES.md come from hf-space-demo/ (simplified, no fetch-abstract/paper-verifier mandates)
-SAGE_DEMO_ROOT = Path(__file__).parent  # hf-space-demo/
+# All agent files live alongside app.py — works both locally and on HF Space
+SAGE_DEMO_ROOT = Path(__file__).parent
+SAGE_APP_ROOT = SAGE_DEMO_ROOT  # agent.yaml, tools/, src/ are in the same dir as app.py
 SAGE_AGENT_DIRS = ["tools", "src", "knowledge"]  # no skills — prevents SKILL MATCH hooks hijacking prompts
 
 # Provider configurations — model strings match pi-ai's registry exactly.

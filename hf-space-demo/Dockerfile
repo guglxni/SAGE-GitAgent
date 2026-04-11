@@ -1,6 +1,6 @@
-# SAGE HuggingFace Space — Docker build
-# Note: This file mirrors /Dockerfile at repo root.
-# For HF Spaces, use the root Dockerfile (HF requires Dockerfile at repo root).
+# SAGE HuggingFace Space — standalone Docker build
+# Build context: hf-space-demo/ directory (COPY . /app gets all agent files)
+# HuggingFace Spaces: Dockerfile at repo root, app_port: 7860
 
 FROM python:3.12-slim
 
@@ -21,21 +21,22 @@ COPY . /app
 
 # ── Node.js tools ──────────────────────────────────────────────────────────
 RUN npm install -g gitclaw
+
+# Pre-cache gitnexus@1.5.3 so npx doesn't download it at runtime per request
 RUN npx -y gitnexus@1.5.3 --version 2>/dev/null || \
     npx -y gitnexus@1.5.3 --help 2>/dev/null || true
 
 # ── Python dependencies ────────────────────────────────────────────────────
 ENV UV_SYSTEM_PYTHON=1
-RUN uv sync --all-groups 2>/dev/null || true
-RUN uv pip install -e . streamlit
+RUN uv pip install streamlit
 
 # ── Verify agent files ─────────────────────────────────────────────────────
-RUN ls /app/agent.yaml /app/SOUL.md /app/RULES.md /app/skills /app/tools /app/src \
+RUN ls /app/agent.yaml /app/SOUL.md /app/RULES.md /app/tools /app/src \
     && echo "SAGE agent files verified."
 
 # ── Runtime ───────────────────────────────────────────────────────────────
 EXPOSE 7860
-CMD ["streamlit", "run", "hf-space-demo/app.py", \
+CMD ["streamlit", "run", "app.py", \
      "--server.port", "7860", \
      "--server.address", "0.0.0.0", \
      "--server.headless", "true", \

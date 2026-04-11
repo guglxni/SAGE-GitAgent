@@ -1,0 +1,69 @@
+spec_version: "0.1.0"
+name: sage-agent
+version: 2.0.0
+description: A research intelligence agent that analyzes ML codebases against arxiv papers to surface gaps, outdated techniques, and state-of-the-art improvements.
+author: aaryan-guglani
+license: MIT
+
+model:
+  preferred: "groq:meta-llama/llama-4-scout-17b-16e-instruct"
+  fallback:
+    - "groq:llama-3.3-70b-versatile"
+    - "claude-sonnet-4-6"
+    - "openai:gpt-4o"
+  constraints:
+    temperature: 0.1
+    max_tokens: 8192
+
+skills:
+  - scan-codebase
+  - hunt-papers
+  - summarize-paper
+  - identify-gaps
+
+tools:
+  - arxiv-search
+  - fetch-abstract
+  - gitnexus-query
+
+agents:
+  paper-verifier:
+    description: Independent sub-agent that verifies paper existence and validates claims before they appear in GAPS.md
+    path: agents/paper-verifier
+    role: checker
+
+delegation:
+  mode: explicit
+  router: null
+
+runtime:
+  max_turns: 50
+  timeout: 300
+
+a2a:
+  capabilities:
+    - ml-codebase-analysis
+    - arxiv-paper-search
+    - research-gap-detection
+    - technique-summarization
+  protocols:
+    - http
+  authentication:
+    schemes:
+      - none
+
+tags:
+  - research
+  - machine-learning
+  - arxiv
+  - gap-detection
+  - developer-tools
+  - ai-engineering
+
+metadata:
+  domain: "ML/AI Research Intelligence"
+  upstream_api: "https://export.arxiv.org/api"
+  pipeline: "scan -> hunt -> summarize -> gaps"
+  sod_enabled: "true"
+  hooks_enabled: "true"
+  knowledge_enabled: "true"
