@@ -169,30 +169,73 @@ def build_provider_env(
 # ── Prompt Template ───────────────────────────────────────────────────────────
 
 def build_prompt(repo_name: str) -> str:
-    return f"""Analyze the ML codebase '{repo_name}'. It is indexed in gitnexus as repo '{repo_name}'.
+    return f"""You are SAGE — a research intelligence agent. Your mission: scan the ML codebase '{repo_name}', \
+cross-reference its implementations against cutting-edge arXiv papers, and produce a localized gap analysis \
+showing exactly where the code diverges from state-of-the-art research.
 
-Complete EXACTLY these 3 steps IN ORDER. For EACH step, call the write tool immediately — do NOT fetch extra data after writing.
+The codebase is indexed in gitnexus under repo name '{repo_name}'.
 
-STEP 1 — SCAN (3 gitnexus queries, then write file):
-Call gitnexus-query 3 times:
-  1. query="optimizer training AdamW SGD" repo="{repo_name}"
-  2. query="transformer attention neural network" repo="{repo_name}"
-  3. query="loss function cross entropy" repo="{repo_name}"
-IMMEDIATELY call write(path="TECHNIQUES.md", content="# ML Techniques in {repo_name}\\n\\n## Detected:\\n[technique — file:line — description]\\n\\n## Notable Absences:\\n[missing patterns for this architecture]")
+You MUST write exactly 3 files. You are NOT done until all 3 are written. Proceed through all steps without stopping.
 
-STEP 2 — PAPERS (2 arxiv searches, then write file):
-Call arxiv-search 2 times for top 2 techniques from Step 1.
-IMMEDIATELY call write(path="PAPERS.md", content="# Relevant Papers for {repo_name}\\n\\n## [Technique Name]\\n- **[Title]** — arxiv:[ID]\\n  Why relevant: [one sentence]\\n...")
+━━━ STEP 1: AST SCAN → write TECHNIQUES.md ━━━
+Run these 4 gitnexus-query calls (pass repo="{repo_name}" in each):
+  • query="model architecture classes nn.Module transformer"
+  • query="optimizer AdamW SGD learning rate scheduler"
+  • query="loss function cross entropy training loop"
+  • query="attention mechanism positional encoding embedding"
+Then IMMEDIATELY call write with path="TECHNIQUES.md" and content:
+# ML Techniques in {repo_name}
 
-STEP 3 — GAPS (write file immediately, no extra tool calls):
-Using ONLY what you know from Steps 1 and 2, IMMEDIATELY call:
-write(path="GAPS.md", content="# Research Gaps in {repo_name}\\n\\n## Critical Gaps\\n- **[Gap Name]**: [current code vs paper recommendation] — arxiv:[ID]\\n\\n## Improvement Opportunities\\n- [concrete improvement with paper citation]")
+## Detected Techniques
+[For each found: **TechniqueName** — `file:line` — what it does and key hyperparameters]
 
-RULES:
-- Call write tool exactly 3 times (TECHNIQUES.md, PAPERS.md, GAPS.md)
-- After writing each file, proceed to the NEXT step immediately
-- Do NOT call fetch-abstract — use paper titles/IDs directly
-- Do NOT describe what to write — call write(path=..., content=...) with actual content"""
+## Notable Absences
+[Standard patterns missing for this architecture type — these are prime gap candidates]
+
+━━━ STEP 2: ARXIV HUNT → write PAPERS.md ━━━
+(Do this AFTER writing TECHNIQUES.md — do not stop between steps)
+Call arxiv-search 3 times — target the top techniques AND the notable absences from Step 1:
+  • One query for the core model architecture
+  • One query for the primary training technique / optimizer
+  • One query for a notable absence (a technique the codebase is missing)
+Then IMMEDIATELY call write with path="PAPERS.md" and content:
+# Relevant arXiv Papers for {repo_name}
+
+## High Relevance
+[**arxiv:XXXX.XXXXX** — Paper Title (Year) — Technique: X — Why: one sentence on direct applicability]
+
+## Notable Absence Papers
+[Papers covering techniques the codebase is MISSING — these feed directly into GAPS.md]
+
+━━━ STEP 3: GAP ANALYSIS → write GAPS.md ━━━
+(Do this AFTER writing PAPERS.md — do not stop between steps)
+Using only findings from Steps 1 and 2, IMMEDIATELY call write with path="GAPS.md" and content:
+# Research Gap Analysis: {repo_name}
+
+## Summary
+SAGE bridges ML/AI engineering practice against theoretical research.
+This report maps where '{repo_name}' diverges from state-of-the-art.
+- Techniques detected: [N]
+- Papers cross-referenced: [N]
+- Gaps identified: [N Critical | N Improvement | N Experimental]
+
+## Critical Gaps
+[**Gap Name**: what the code currently does vs what the paper recommends.
+ - Current impl: `file:line` uses [X]
+ - SOTA paper: arxiv:XXXX.XXXXX recommends [Y] — concrete expected improvement]
+
+## Improvement Opportunities
+[Techniques from PAPERS.md that could be added to strengthen the codebase, with arxiv citations]
+
+## Experimental Suggestions
+[Cutting-edge ideas from recent papers that are worth exploring for this architecture]
+
+━━━ HARD RULES ━━━
+- You MUST call write() exactly 3 times: TECHNIQUES.md, PAPERS.md, GAPS.md
+- GAPS.md is the primary deliverable — make it specific and actionable with paper citations
+- Do NOT call fetch-abstract (use paper titles/IDs from arxiv-search results directly)
+- Do NOT stop after TECHNIQUES.md — continue immediately to STEP 2 then STEP 3
+- Task is INCOMPLETE until GAPS.md is written"""
 
 
 # ── Pipeline Execution ────────────────────────────────────────────────────────
