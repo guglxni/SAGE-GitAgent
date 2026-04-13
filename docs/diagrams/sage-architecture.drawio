@@ -1,0 +1,210 @@
+<mxGraphModel dx="1422" dy="762" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1200" pageHeight="850" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- ═══ TITLE ═══ -->
+    <mxCell id="100" value="SAGE System Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;fontColor=#1a237e;" vertex="1" parent="1">
+      <mxGeometry x="50" y="15" width="1100" height="32" as="geometry" />
+    </mxCell>
+    <mxCell id="101" value="A Git-Native ML Research Intelligence Agent  —  GitAgent Standard · Lyzr AI Hackathon 2026" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#607D8B;" vertex="1" parent="1">
+      <mxGeometry x="50" y="46" width="1100" height="18" as="geometry" />
+    </mxCell>
+
+    <!-- ═══ ZONE A: USER INTERFACES (top strip) ═══ -->
+    <mxCell id="200" value="USER INTERFACES" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontStyle=1;fontColor=#90A4AE;spacingLeft=6;" vertex="1" parent="1">
+      <mxGeometry x="60" y="72" width="200" height="16" as="geometry" />
+    </mxCell>
+
+    <!-- HF Space box -->
+    <mxCell id="210" value="&lt;b&gt;Hugging Face Space&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#90A4AE;&quot;&gt;guglxni/SAGE-GitAgent-Demo&lt;br&gt;Streamlit · Docker · port 7860&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EAF6;strokeColor=#3949AB;fontColor=#1A237E;fontSize=11;arcSize=8;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="60" y="90" width="250" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- gitclaw CLI box -->
+    <mxCell id="220" value="&lt;b&gt;gitclaw CLI (local)&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#90A4AE;&quot;&gt;npx gitclaw --dir . --prompt ...&lt;br&gt;Node.js subprocess · Python uv&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EAF6;strokeColor=#3949AB;fontColor=#1A237E;fontSize=11;arcSize=8;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="340" y="90" width="250" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- GitHub Codespace box -->
+    <mxCell id="230" value="&lt;b&gt;GitHub Codespace&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#90A4AE;&quot;&gt;One-click browser VS Code&lt;br&gt;.devcontainer bootstrap&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EAF6;strokeColor=#3949AB;fontColor=#1A237E;fontSize=11;arcSize=8;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="620" y="90" width="250" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- Developer box -->
+    <mxCell id="240" value="&lt;b&gt;Developer&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#607D8B;&quot;&gt;ML Engineer · Researcher&lt;br&gt;PhD Student · Tech Lead&lt;/font&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;fontColor=#4A148C;fontSize=11;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="910" y="90" width="210" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- ═══ ARROWS: UI → SAGE CORE ═══ -->
+    <mxCell id="250" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#3949AB;strokeWidth=1.5;endArrow=block;endFill=1;dashed=1;" edge="1" source="210" target="310" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="251" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#3949AB;strokeWidth=1.5;endArrow=block;endFill=1;dashed=1;" edge="1" source="220" target="310" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="252" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#3949AB;strokeWidth=1.5;endArrow=block;endFill=1;dashed=1;" edge="1" source="230" target="310" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="253" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7B1FA2;strokeWidth=1.5;endArrow=block;endFill=1;dashed=1;" edge="1" source="240" target="310" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══ ZONE B: SAGE AGENT CORE (large center box) ═══ -->
+    <mxCell id="300" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F9FF;strokeColor=#1565C0;fontColor=#1565C0;fontSize=12;arcSize=3;strokeWidth=2.5;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="60" y="200" width="1080" height="420" as="geometry" />
+    </mxCell>
+    <mxCell id="301" value="SAGE AGENT CORE" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontStyle=1;fontColor=#1565C0;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="68" y="205" width="200" height="16" as="geometry" />
+    </mxCell>
+
+    <!-- SAGE Agent receives prompt -->
+    <mxCell id="310" value="" style="point;x=0.5;y=0;" vertex="1" parent="300">
+      <mxGeometry x="540" y="0" width="0" height="0" as="geometry" />
+    </mxCell>
+
+    <!-- ── Identity / Governance row ── -->
+    <mxCell id="320" value="&lt;b&gt;agent.yaml&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Manifest · Model · Skills · Tools&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;arcSize=6;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="80" y="230" width="180" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="321" value="&lt;b&gt;SOUL.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Identity · Values · Persona&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;arcSize=6;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="278" y="230" width="180" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="322" value="&lt;b&gt;RULES.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Hard constraints · Boundaries&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;arcSize=6;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="476" y="230" width="180" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="323" value="&lt;b&gt;DUTIES.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;SOD policy · paper-verifier&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;arcSize=6;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="674" y="230" width="180" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="324" value="&lt;b&gt;Knowledge Base&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;taxonomy · categories · severity&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;arcSize=6;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="872" y="230" width="238" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- ── 4 Skill boxes (horizontal row) ── -->
+    <mxCell id="330" value="&lt;b&gt;scan-codebase&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;AST extraction&lt;br&gt;→ TECHNIQUES.md&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1565C0;strokeColor=#0D47A1;fontColor=#FFFFFF;fontSize=11;arcSize=6;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="80" y="320" width="200" height="65" as="geometry" />
+    </mxCell>
+    <mxCell id="331" value="&lt;b&gt;hunt-papers&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;arXiv search&lt;br&gt;→ PAPERS.md&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1565C0;strokeColor=#0D47A1;fontColor=#FFFFFF;fontSize=11;arcSize=6;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="310" y="320" width="200" height="65" as="geometry" />
+    </mxCell>
+    <mxCell id="332" value="&lt;b&gt;summarize-paper&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Eng. summaries&lt;br&gt;→ SUMMARIES.md&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1565C0;strokeColor=#0D47A1;fontColor=#FFFFFF;fontSize=11;arcSize=6;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="540" y="320" width="200" height="65" as="geometry" />
+    </mxCell>
+    <mxCell id="333" value="&lt;b&gt;identify-gaps&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Gap classification&lt;br&gt;→ GAPS.md&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0D47A1;strokeColor=#01579B;fontColor=#FFFFFF;fontSize=11;arcSize=6;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="770" y="320" width="200" height="65" as="geometry" />
+    </mxCell>
+
+    <!-- Skill sequence arrows -->
+    <mxCell id="334" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#FFFFFF;strokeWidth=2;endArrow=block;endFill=1;" edge="1" source="330" target="331" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="335" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#FFFFFF;strokeWidth=2;endArrow=block;endFill=1;" edge="1" source="331" target="332" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="336" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#FFFFFF;strokeWidth=2;endArrow=block;endFill=1;" edge="1" source="332" target="333" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ── Tool boxes (below skills) ── -->
+    <mxCell id="340" value="&lt;b&gt;gitnexus-query&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;AST · local · Node&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#37474F;strokeColor=#263238;fontColor=#ECEFF1;fontSize=10;arcSize=8;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="90" y="430" width="180" height="45" as="geometry" />
+    </mxCell>
+    <mxCell id="341" value="&lt;b&gt;arxiv-search&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;REST · free · no auth&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#37474F;strokeColor=#263238;fontColor=#ECEFF1;fontSize=10;arcSize=8;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="318" y="430" width="180" height="45" as="geometry" />
+    </mxCell>
+    <mxCell id="342" value="&lt;b&gt;fetch-abstract&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;batch ID lookup · REST&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#37474F;strokeColor=#263238;fontColor=#ECEFF1;fontSize=10;arcSize=8;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="548" y="430" width="180" height="45" as="geometry" />
+    </mxCell>
+    <mxCell id="343" value="&lt;b&gt;paper-verifier&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;sub-agent · SOD · Claude Haiku&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#37474F;strokeColor=#263238;fontColor=#ECEFF1;fontSize=10;arcSize=8;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="778" y="430" width="180" height="45" as="geometry" />
+    </mxCell>
+
+    <!-- Skill → Tool connector arrows -->
+    <mxCell id="344" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#78909C;strokeWidth=1;endArrow=open;endFill=0;" edge="1" source="330" target="340" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="345" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#78909C;strokeWidth=1;endArrow=open;endFill=0;" edge="1" source="331" target="341" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="346" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#78909C;strokeWidth=1;endArrow=open;endFill=0;" edge="1" source="332" target="342" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="347" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#78909C;strokeWidth=1;endArrow=open;endFill=0;" edge="1" source="333" target="343" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ── LLM Provider row ── -->
+    <mxCell id="350" value="&lt;b&gt;LLM Provider&lt;/b&gt;  (user-supplied key)  ·  Groq Llama 4 Scout  ·  OpenAI GPT-4o  ·  Anthropic Claude  ·  Any OpenAI-compatible endpoint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F57F17;fontColor=#E65100;fontSize=10;arcSize=4;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="80" y="510" width="1060" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- ═══ ZONE C: EXTERNAL SERVICES (below core) ═══ -->
+    <mxCell id="400" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#BDBDBD;fontSize=12;arcSize=3;strokeWidth=1.5;dashed=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="640" width="500" height="90" as="geometry" />
+    </mxCell>
+    <mxCell id="401" value="EXTERNAL SERVICES" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontStyle=1;fontColor=#90A4AE;spacingLeft=6;" vertex="1" parent="1">
+      <mxGeometry x="66" y="643" width="200" height="14" as="geometry" />
+    </mxCell>
+
+    <mxCell id="410" value="&lt;b&gt;arXiv API&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#607D8B;&quot;&gt;export.arxiv.org/api  ·  free  ·  no auth&lt;br&gt;Atom XML  ·  &lt; 3s response&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2F1;strokeColor=#00695C;fontColor=#004D40;fontSize=10;arcSize=6;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="80" y="660" width="220" height="58" as="geometry" />
+    </mxCell>
+
+    <mxCell id="420" value="&lt;b&gt;GitNexus Engine&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#607D8B;&quot;&gt;npx gitnexus@1.5.3  ·  local AST&lt;br&gt;semantic code graph  ·  no upload&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2F1;strokeColor=#00695C;fontColor=#004D40;fontSize=10;arcSize=6;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="320" y="660" width="220" height="58" as="geometry" />
+    </mxCell>
+
+    <!-- ═══ ZONE D: OUTPUT FILES ═══ -->
+    <mxCell id="500" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#BDBDBD;fontSize=12;arcSize=3;strokeWidth=1.5;dashed=1;" vertex="1" parent="1">
+      <mxGeometry x="590" y="640" width="550" height="90" as="geometry" />
+    </mxCell>
+    <mxCell id="501" value="OUTPUT FILES" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontStyle=1;fontColor=#90A4AE;spacingLeft=6;" vertex="1" parent="1">
+      <mxGeometry x="596" y="643" width="140" height="14" as="geometry" />
+    </mxCell>
+
+    <mxCell id="510" value="TECHNIQUES.md" style="shape=mxgraph.flowchart.document;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;fontColor=#1B5E20;fontSize=9;fontStyle=1;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="600" y="658" width="90" height="38" as="geometry" />
+    </mxCell>
+    <mxCell id="511" value="PAPERS.md" style="shape=mxgraph.flowchart.document;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;fontColor=#1B5E20;fontSize=9;fontStyle=1;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="700" y="658" width="90" height="38" as="geometry" />
+    </mxCell>
+    <mxCell id="512" value="SUMMARIES.md" style="shape=mxgraph.flowchart.document;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;fontColor=#1B5E20;fontSize=9;fontStyle=1;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="800" y="658" width="90" height="38" as="geometry" />
+    </mxCell>
+    <mxCell id="513" value="GAPS.md" style="shape=mxgraph.flowchart.document;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontColor=#BF360C;fontSize=9;fontStyle=1;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="900" y="658" width="90" height="38" as="geometry" />
+    </mxCell>
+    <mxCell id="514" value="RELATED_WORK" style="shape=mxgraph.flowchart.document;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontColor=#BF360C;fontSize=9;fontStyle=1;strokeWidth=1.5;" vertex="1" parent="1">
+      <mxGeometry x="1000" y="658" width="110" height="38" as="geometry" />
+    </mxCell>
+
+    <!-- Connector: Tools → External Services -->
+    <mxCell id="600" value="HTTP" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#00695C;strokeWidth=1.5;endArrow=open;endFill=0;fontColor=#00695C;fontSize=9;fontStyle=2;" edge="1" source="341" target="410" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="601" value="HTTP" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#00695C;strokeWidth=1.5;endArrow=open;endFill=0;fontColor=#00695C;fontSize=9;fontStyle=2;" edge="1" source="342" target="410" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="602" value="npx" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#00695C;strokeWidth=1.5;endArrow=open;endFill=0;fontColor=#00695C;fontSize=9;fontStyle=2;" edge="1" source="340" target="420" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Connector: Skills → Output files -->
+    <mxCell id="610" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#388E3C;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" source="330" target="510" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="611" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#388E3C;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" source="331" target="511" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="612" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#388E3C;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" source="332" target="512" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="613" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" source="333" target="513" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="614" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" source="333" target="514" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+  </root>
+</mxGraphModel>

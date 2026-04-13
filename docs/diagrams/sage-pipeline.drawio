@@ -1,0 +1,136 @@
+<mxGraphModel dx="1422" dy="762" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="900" pageHeight="1150" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- ═══ TITLE BLOCK ═══ -->
+    <mxCell id="100" value="SAGE Pipeline Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#1a237e;" vertex="1" parent="1">
+      <mxGeometry x="50" y="18" width="800" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="101" value="Search · Analyze · Gap-detect · Explain  —  GitAgent Standard v0.1.0" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#607D8B;" vertex="1" parent="1">
+      <mxGeometry x="50" y="52" width="800" height="20" as="geometry" />
+    </mxCell>
+
+    <!-- ═══ DIVIDER LINE ═══ -->
+    <mxCell id="102" value="" style="endArrow=none;strokeColor=#BDBDBD;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry x="50" y="78" width="800" height="10" as="geometry">
+        <Array as="points">
+          <mxPoint x="850" y="78" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- ═══ INPUT: SOURCE REPOSITORY ═══ -->
+    <mxCell id="200" value="&lt;b&gt;Source Repository&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#607D8B;&quot;&gt;*.py  ·  *.ts  ·  *.rs  ·  *.ipynb  ·  any ML codebase&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECEFF1;strokeColor=#78909C;fontColor=#37474F;fontSize=12;arcSize=8;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="300" y="90" width="300" height="55" as="geometry" />
+    </mxCell>
+
+    <!-- Arrow: Source → Skill 1 -->
+    <mxCell id="201" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#455A64;strokeWidth=2;endArrow=block;endFill=1;" edge="1" source="200" target="300" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══ SKILL 1: scan-codebase ═══ -->
+    <mxCell id="300" value="&lt;b&gt;&lt;font style=&quot;font-size:13px;&quot;&gt;SKILL 1 — scan-codebase&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px;&quot;&gt;AST-based extraction of ML techniques, architectures, optimizers, loss functions, and training patterns&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#BBDEFB;&quot;&gt;⚙  Tool: gitnexus-query @ 1.5.3&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1565C0;strokeColor=#0D47A1;fontColor=#FFFFFF;fontSize=12;arcSize=6;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="150" y="185" width="600" height="85" as="geometry" />
+    </mxCell>
+
+    <!-- Arrow: Skill 1 → TECHNIQUES.md -->
+    <mxCell id="301" value="writes" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2E7D32;strokeWidth=2;endArrow=block;endFill=1;fontColor=#2E7D32;fontSize=10;fontStyle=2;labelBackgroundColor=#FFFFFF;" edge="1" source="300" target="310" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- TECHNIQUES.md -->
+    <mxCell id="310" value="&lt;b&gt;TECHNIQUES.md&lt;/b&gt;" style="shape=mxgraph.flowchart.document;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;fontColor=#1B5E20;fontSize=12;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="300" y="308" width="300" height="52" as="geometry" />
+    </mxCell>
+
+    <!-- Arrow: TECHNIQUES → Skill 2 -->
+    <mxCell id="311" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#455A64;strokeWidth=2;endArrow=block;endFill=1;" edge="1" source="310" target="400" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══ SKILL 2: hunt-papers ═══ -->
+    <mxCell id="400" value="&lt;b&gt;&lt;font style=&quot;font-size:13px;&quot;&gt;SKILL 2 — hunt-papers&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px;&quot;&gt;Constructs targeted arXiv queries for detected techniques and known absences&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#BBDEFB;&quot;&gt;⚙  Tool: arxiv-search  ·  export.arxiv.org/api  ·  free, no auth&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1565C0;strokeColor=#0D47A1;fontColor=#FFFFFF;fontSize=12;arcSize=6;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="150" y="400" width="600" height="85" as="geometry" />
+    </mxCell>
+
+    <!-- Arrow: Skill 2 → PAPERS.md -->
+    <mxCell id="401" value="writes" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2E7D32;strokeWidth=2;endArrow=block;endFill=1;fontColor=#2E7D32;fontSize=10;fontStyle=2;labelBackgroundColor=#FFFFFF;" edge="1" source="400" target="410" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- PAPERS.md -->
+    <mxCell id="410" value="&lt;b&gt;PAPERS.md&lt;/b&gt;" style="shape=mxgraph.flowchart.document;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;fontColor=#1B5E20;fontSize=12;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="300" y="523" width="300" height="52" as="geometry" />
+    </mxCell>
+
+    <!-- Arrow: PAPERS → Skill 3 -->
+    <mxCell id="411" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#455A64;strokeWidth=2;endArrow=block;endFill=1;" edge="1" source="410" target="500" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══ SKILL 3: summarize-paper ═══ -->
+    <mxCell id="500" value="&lt;b&gt;&lt;font style=&quot;font-size:13px;&quot;&gt;SKILL 3 — summarize-paper&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px;&quot;&gt;Engineering-focused summaries with implementation complexity scores and drop-in code sketches&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#BBDEFB;&quot;&gt;⚙  Tool: fetch-abstract  ·  batch arXiv ID lookup&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1565C0;strokeColor=#0D47A1;fontColor=#FFFFFF;fontSize=12;arcSize=6;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="150" y="615" width="600" height="85" as="geometry" />
+    </mxCell>
+
+    <!-- Arrow: Skill 3 → SUMMARIES.md -->
+    <mxCell id="501" value="writes" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2E7D32;strokeWidth=2;endArrow=block;endFill=1;fontColor=#2E7D32;fontSize=10;fontStyle=2;labelBackgroundColor=#FFFFFF;" edge="1" source="500" target="510" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- SUMMARIES.md -->
+    <mxCell id="510" value="&lt;b&gt;SUMMARIES.md&lt;/b&gt;" style="shape=mxgraph.flowchart.document;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;fontColor=#1B5E20;fontSize=12;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="300" y="738" width="300" height="52" as="geometry" />
+    </mxCell>
+
+    <!-- Arrow: SUMMARIES → Skill 4 -->
+    <mxCell id="511" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#455A64;strokeWidth=2;endArrow=block;endFill=1;" edge="1" source="510" target="600" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══ SKILL 4: identify-gaps ═══ -->
+    <mxCell id="600" value="&lt;b&gt;&lt;font style=&quot;font-size:13px;&quot;&gt;SKILL 4 — identify-gaps&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px;&quot;&gt;Cross-references codebase techniques against paper summaries  ·  Severity: 🔴 Critical  🟡 Improvement  🟢 Experimental&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#BBDEFB;&quot;&gt;⚙  Sub-agent: paper-verifier (Segregation of Duties enforcement)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0D47A1;strokeColor=#01579B;fontColor=#FFFFFF;fontSize=12;arcSize=6;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="150" y="830" width="600" height="90" as="geometry" />
+    </mxCell>
+
+    <!-- Arrow: Skill 4 → GAPS.md -->
+    <mxCell id="601" value="writes" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;endArrow=block;endFill=1;fontColor=#E65100;fontSize=10;fontStyle=2;labelBackgroundColor=#FFFFFF;exitX=0.28;exitY=1;exitDx=0;exitDy=0;" edge="1" source="600" target="610" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Arrow: Skill 4 → RELATED_WORK.md -->
+    <mxCell id="602" value="writes" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;endArrow=block;endFill=1;fontColor=#E65100;fontSize=10;fontStyle=2;labelBackgroundColor=#FFFFFF;exitX=0.72;exitY=1;exitDx=0;exitDy=0;" edge="1" source="600" target="620" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- GAPS.md -->
+    <mxCell id="610" value="&lt;b&gt;GAPS.md&lt;/b&gt;" style="shape=mxgraph.flowchart.document;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontColor=#BF360C;fontSize=12;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="155" y="970" width="255" height="52" as="geometry" />
+    </mxCell>
+
+    <!-- RELATED_WORK.md -->
+    <mxCell id="620" value="&lt;b&gt;RELATED_WORK.md&lt;/b&gt;" style="shape=mxgraph.flowchart.document;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontColor=#BF360C;fontSize=12;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="490" y="970" width="255" height="52" as="geometry" />
+    </mxCell>
+
+    <!-- ═══ LEGEND ═══ -->
+    <mxCell id="700" value="&lt;b&gt;Legend&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#455A64;" vertex="1" parent="1">
+      <mxGeometry x="50" y="1060" width="80" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="701" value="SAGE Skill" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1565C0;strokeColor=#0D47A1;fontColor=#FFFFFF;fontSize=10;arcSize=6;strokeWidth=1;" vertex="1" parent="1">
+      <mxGeometry x="50" y="1083" width="110" height="26" as="geometry" />
+    </mxCell>
+    <mxCell id="702" value="Intermediate File" style="shape=mxgraph.flowchart.document;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;fontColor=#1B5E20;fontSize=10;strokeWidth=1;" vertex="1" parent="1">
+      <mxGeometry x="175" y="1083" width="130" height="26" as="geometry" />
+    </mxCell>
+    <mxCell id="703" value="Final Output" style="shape=mxgraph.flowchart.document;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontColor=#BF360C;fontSize=10;strokeWidth=1;" vertex="1" parent="1">
+      <mxGeometry x="320" y="1083" width="110" height="26" as="geometry" />
+    </mxCell>
+    <mxCell id="704" value="External Input" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECEFF1;strokeColor=#78909C;fontColor=#37474F;fontSize=10;arcSize=8;strokeWidth=1;" vertex="1" parent="1">
+      <mxGeometry x="445" y="1083" width="120" height="26" as="geometry" />
+    </mxCell>
+
+  </root>
+</mxGraphModel>
